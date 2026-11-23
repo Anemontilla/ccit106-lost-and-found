@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lost &amp; Found — team-dynamos.app</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #f5f7fa; color: #111; }
+header { background: #0b5ed7; color: #fff; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+header a { color: #fff; text-decoration: none; margin-left: 1rem; opacity: 0.9; }
+header a:hover { opacity: 1; }
+main { max-width: 900px; margin: 1rem auto; padding: 0 1rem; }
+.card { background: #fff; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.5rem; align-items: end; }
+input, select, textarea { padding: 0.5rem; font-size: 1rem; }
+button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; background: #0b5ed7; color: #fff; border: none; border-radius: 6px; }
+button.secondary { background: #6c757d; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+.open { color: #198754; font-weight: bold; }
+.claimed { color: #dc3545; font-weight: bold; }
+.resolved { color: #6c757d; font-weight: bold; }
+.msg { margin-top: 0.5rem; padding: 0.5rem; border-radius: 6px; font-size: 0.95rem; }
+.msg.ok { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.msg.err { background: #f8d7da; color: #721c24; border: 1px solid #f5c2c7; }
+.hidden { display: none; }
+.tab { display: inline-block; padding: 0.4rem 0.9rem; margin-right: 0.4rem; background: #e9ecef; border-radius: 6px; cursor: pointer; }
+.tab.active { background: #0b5ed7; color: #fff; }
+.tab-content { margin-top: 1rem; }
+.small { font-size: 0.85rem; color: #666; }
+</style>
+</head>
+<body>
+<header>
+  <div style="font-weight:700; font-size:1.25rem;">Lost &amp; Found</div>
+  <div id="auth"></div>
+</header>
+<main>
+  <div id="msg" class="msg hidden"></div>
+  <div id="login" class="card">
+    <h2>Login</h2>
+    <form id="form-login">
+      <input id="u-username" placeholder="Username" required>
+      <input id="u-password" type="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+      <a href="#" onclick="show('signup')">Don't have an account? Sign up</a>
+    </form>
+  </div>
+  <div id="signup" class="card hidden">
+    <h2>Sign up</h2>
+    <form id="form-signup">
+      <input id="s-username" placeholder="Username" required>
+      <input id="s-id" placeholder="ID number (optional)">
+      <select id="s-role"><option>Normal_User</option><option>Management</option></select>
+      <input id="s-password" type="password" placeholder="Password" required>
+      <button type="submit">Create account</button>
+      <a href="#" onclick="show('login')">Already have an account? Login</a>
+    </form>
+  </div>
+  <div id="app" class="hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <span id="user-info"></span>
+      <button onclick="auth.logout()" class="secondary">Logout</button>
+    </div>
+    <div class="tabs">
+      <span class="tab active" onclick="tab('lost')">Lost Items</span>
+      <span class="tab" onclick="tab('found')">Found Items</span>
+      <span class="tab" onclick="tab('search')">Search</span>
+      <span class="tab" onclick="tab('claims')">My Claims</span>
+      <span id="mgmt-tab" class="tab hidden" onclick="tab('management')">Management</span>
+    </div>
+    <div id="tab-lost" class="tab-content"></div>
+    <div id="tab-found" class="tab-content"></div>
+    <div id="tab-search" class="tab-content">
+      <input id="search-q" placeholder="Search items..." oninput="debouncedSearch()">
+      <div id="search-results"></div>
+    </div>
+    <div id="tab-claims" class="tab-content"></div>
+    <div id="tab-management" class="tab-content"></div>
+    <form id="form-report" class="card hidden" style="margin-top:1rem;">
+      <h3>Report an item</h3>
+      <input id="r-name" placeholder="Item name" required>
+      <input id="r-desc" placeholder="Description" required>
+      <input id="r-date" type="date" required>
+      <input id="r-loc" placeholder="Location" required>
+      <button type="submit">Report</button>
+    </form>
+    <button id="btn-report" onclick="toggleReport()" class="secondary small">+ Report an item</button>
+  </div>
+</main>
+
+<script>
+const API = '/api';
+function show(id){ document.querySelectorAll('main > .card, main > #app').forEach(el=>el.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+function msg(text, ok){ const m = document.getElementById('msg'); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); m.classList.remove('hidden'); setTimeout(()=>m.classList.add('hidden'), 5000); }
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts });
+  if (r.status === 401) { show('login'); throw new Error('auth'); }
+  return r.json();
+}
+const auth = {
+  login: async () => {
+    const fd = new FormData(document.getElementById('form-login'));
+    try {
+      await api('/auth/login', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }) });
+      initApp();
+    } catch (e) { msg('Login failed.'); }
+  },
+  signup: async () => {
+    const fd = new FormData(document.getElementById('form-signup'));
+    try {
+      await api('/auth/signup', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), id_number: fd.get('id'), role: fd.get('role'), password: fd.get('password') }) });
+      show('login'); msg('Account created. Please login.', true);
+    } catch (e) { msg('Signup failed.'); }
+  },
+  logout: async () => { await api('/auth/logout', { method: 'POST' }); show('login'); },
+};
+document.getElementById('form-login').onsubmit = (e) => { e.preventDefault(); auth.login(); };
+document.getElementById('form-signup').onsubmit = (e) => { e.preventDefault(); auth.signup(); };
+
+async function initApp() {
+  const me = await api('/auth/me');
+  if (!me.user) return show('login');
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('signup').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('user-info').textContent = `Logged in as ${me.user.username} (${me.user.role})`;
+  document.getElementById('mgmt-tab').classList.remove('hidden');
+  loadItems('lost'); loadItems('found'); loadClaims();
+  if (me.user.role === 'Management') loadManagement();
+}
+
+function tab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  if (name === 'lost') loadItems('lost');
+  if (name === 'found') loadItems('found');
+  if (name === 'claims') loadClaims();
+  if (name === 'management') loadManagement();
+}
+
+async function loadItems(type) {
+  const { items } = await api('/items/' + type);
+  const rows = items.map(it => `<tr>
+    <td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.description || '')}</td>
+    <td>${it.item_date}</td><td>${escapeHtml(it.location)}</td>
+    <td class="${it.status.toLowerCase()}">${it.status}</td>
+    <td>${it.status === 'Open' ? `<button onclick="claimItem('${type}', ${it.item_id})">Claim</button>` : (it.claimed_by ? 'Claimed' : '—')}</td>
+  </tr>`).join('');
+  const html = `<table><thead><tr><th>Name</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('tab-' + type).innerHTML = html;
+}
+
+async function claimItem(type, id) {
+  await api('/items/' + type + '/' + id + '/claim', { method: 'POST' });
+  loadItems(type);
+}
+
+async function loadClaims() {
+  const { pending } = await api('/claims');
+  const rows = pending.map(c => `<tr>
+    <td>#${c.id} ${escapeHtml(c.item_type)} ${c.item_id}</td><td>${escapeHtml(c.requester)}</td>
+    <td>${escapeHtml(c.reason)}</td><td><button onclick="loadClaims()">Refresh</button></td>
+  </tr>`).join('');
+  document.getElementById('tab-claims').innerHTML = `<h3>My claims (pending)</h3>
+    ${rows.length ? `<table><tr><th>Item</th><th>Requester</th><th>Reason</th><th></th></tr>${rows}</table>` : '<p>No pending claims.</p>'}`;
+}
+async function loadManagement() {
+  const { pending, history } = await api('/claims');
+  const p = pending.map(c => `<tr><td>#${c.id}</td><td>${escapeHtml(c.item_type)} #${c.item_id}</td><td>${escapeHtml(c.requester)}</td><td>${escapeHtml(c.reason)}</td>
+    <td><button onclick="processClaim(${c.id}, 'approve')">Approve</button> <button onclick="processClaim(${c.id}, 'decline')">Decline</button></td></tr>`).join('');
+  const h = history.map(c => `<tr><td>#${c.id}</td><td>${escapeHtml(c.item_type)} #${c.item_id}</td><td>${escapeHtml(c.requester)}</td><td>${c.status}</td><td>${escapeHtml(c.manager_note || '')}</td></tr>`).join('');
+  document.getElementById('tab-management').innerHTML = `<h3>Management — pending claim requests</h3>
+    ${p.length ? `<table><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr>${p}</table>` : '<p>No pending requests.</p>'}
+    <h3>History</h3>
+    ${h.length ? `<table><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr>${h}</table>` : '<p>No history.</p>'}`;
+}
+async function processClaim(id, action) {
+  const note = prompt(action === 'approve' ? 'Approval note:' : 'Decline reason:');
+  await api(`/claims/${id}/${action}`, { method: 'POST', body: JSON.stringify({ manager_note: note || '' }) });
+  loadManagement();
+  loadItems('lost'); loadItems('found');
+}
+
+async function doSearch() {
+  const q = document.getElementById('search-q').value;
+  const { results } = await api('/search?q=' + encodeURIComponent(q));
+  const lost = results.lost.map(i => `<li>${escapeHtml(i.name)} — ${escapeHtml(i.location)} (${i.status})</li>`).join('');
+  const found = results.found.map(i => `<li>${escapeHtml(i.name)} — ${escapeHtml(i.location)} (${i.status})</li>`).join('');
+  document.getElementById('search-results').innerHTML = `<strong>Lost:</strong> <ul>${lost || '<li>none</li>'}</ul><strong>Found:</strong> <ul>${found || '<li>none</li>'}</ul>`;
+}
+let searchTimer;
+function debouncedSearch(){ clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); }
+
+document.getElementById('btn-report').onclick = () => {
+  const f = document.getElementById('form-report'); f.classList.toggle('hidden');
+};
+document.getElementById('form-report').onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const type = location.hash ? location.hash.slice(1) : 'lost';
+  await api('/items/' + type, { method: 'POST', body: JSON.stringify({ name: fd.get('name'), description: fd.get('desc'), date: fd.get('date'), location: fd.get('loc') }) });
+  e.target.reset(); f.classList.add('hidden'); loadItems(type);
+};
+function escapeHtml(t){ return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
+initApp();
+</script>
+</body>
+</html>
