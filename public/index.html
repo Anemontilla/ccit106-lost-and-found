@@ -3,115 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lost &amp; Found â€” team-dynamos.app</title>
+<meta name="description" content="Lost &amp; Found — report, search, and claim lost and found items.">
+<title>Lost &amp; Found — team-dynamos.app</title>
 <style>
+:root {
+  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px;
+  --color-bg: #f8fafc; --color-surface: #ffffff; --color-text: #0f172a; --color-text-secondary: #64748b;
+  --color-border: #e2e8f0; --color-primary: #2563eb; --color-primary-hover: #1d4ed8;
+  --color-success: #16a34a; --color-danger: #dc2626; --color-muted-bg: #f1f5f9;
+  --radius: 8px; --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --font-body: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem; --font-size-xl: 1.25rem; --font-size-2xl: 1.5rem;
+  --line-height-tight: 1.25; --line-height-normal: 1.5; --font-weight-medium: 500; --font-weight-semibold: 600;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --primary: #2563eb; --primary-hover: #1d4ed8; --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --success: #16a34a; --danger: #dc2626; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 2rem; position: sticky; top: 0; z-index: 100; }
-.navbar { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; height: 64px; }
-.brand { font-size: 1.25rem; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
-.brand span { color: var(--text); }
-.nav-links { display: flex; gap: 1.5rem; align-items: center; }
-.nav-links a { color: var(--muted); text-decoration: none; font-size: 0.95rem; font-weight: 500; }
-.nav-links a:hover { color: var(--primary); }
-.user-info { color: var(--muted); font-size: 0.9rem; }
-main { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+body { font-family: var(--font-body); background: var(--color-bg); color: var(--color-text); line-height: var(--line-height-normal); font-size: var(--font-size-base); }
+header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 100; }
+.navbar { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; height: 64px; padding: 0 var(--space-lg); }
+.brand { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-primary); letter-spacing: -0.02em; }
+.brand span { color: var(--color-text); }
+.nav-links { display: flex; gap: var(--space-lg); align-items: center; }
+.nav-links a { color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.nav-links a:hover { color: var(--color-primary); }
+.user-info { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+main { max-width: 1200px; margin: 0 auto; padding: var(--space-xl) var(--space-lg); }
 .page { display: none; }
 .page.active { display: block; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.card h2 { font-size: 1.25rem; margin-bottom: 1rem; color: var(--text); }
-.card h3 { font-size: 1rem; margin-bottom: 0.75rem; color: var(--text); }
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.form-group input, .form-group select { width: 100%; padding: 0.7rem 0.95rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--card); }
-.form-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1.4rem; border-radius: 8px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.15s; text-decoration: none; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
-.btn-secondary { background: var(--muted); color: #fff; }
-.btn-secondary:hover { background: #475569; transform: translateY(-1px); }
-.btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
-.btn-outline:hover { background: rgba(37, 99, 235, 0.05); transform: translateY(-1px); }
-.btn-sm { padding: 0.45rem 0.85rem; font-size: 0.85rem; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.alert { padding: 0.9rem 1.1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.92rem; display: none; animation: slideIn 0.3s ease; }
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card.p-lg { padding: var(--space-xl); }
+h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-md); }
+h2 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-md); }
+h3 { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-sm); }
+p { color: var(--color-text-secondary); margin-bottom: var(--space-md); }
+.form-group { margin-bottom: var(--space-md); }
+.form-group label { display: block; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text); margin-bottom: var(--space-xs); }
+.form-group input, .form-group select { width: 100%; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--font-size-base); background: var(--color-surface); transition: border-color 0.2s, box-shadow 0.2s; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius); border: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); cursor: pointer; transition: background 0.2s, opacity 0.2s; text-decoration: none; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary); color: #ffffff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.btn-secondary { background: var(--color-muted-bg); color: var(--color-text); }
+.btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
+.btn-outline { background: transparent; color: var(--color-primary); border: 1px solid var(--color-primary); }
+.btn-outline:hover:not(:disabled) { background: rgb(37 99 235 / 0.05); }
+.btn-sm { padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-xs); }
+.btn-danger { background: var(--color-danger); color: #ffffff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-success { background: var(--color-success); color: #ffffff; }
+.btn-success:hover:not(:disabled) { background: #15803d; }
+.btn-loading { opacity: 0.7; cursor: not-allowed; }
+.btn-loading .btn-text { display: none; }
+.btn-loading .btn-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.alert { padding: var(--space-sm) var(--space-md); border-radius: var(--radius); font-size: var(--font-size-sm); margin-bottom: var(--space-md); display: none; }
 .alert.show { display: block; }
-@keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-.tabs { display: flex; gap: 0.4rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 0.75rem; overflow-x: auto; }
-.tab { padding: 0.6rem 1.1rem; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 0.92rem; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-.tab:hover { color: var(--primary); background: #f8fafc; border-bottom-color: var(--primary); }
-.tab.active { color: var(--primary); background: #eff6ff; border-bottom-color: var(--primary); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; }
+.tabs { display: flex; gap: var(--space-xs); margin-bottom: var(--space-lg); border-bottom: 2px solid var(--color-border); padding-bottom: var(--space-sm); overflow-x: auto; }
+.tab { padding: var(--space-sm) var(--space-md); color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); border-radius: var(--radius) var(--radius) 0 0; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.tab:hover { color: var(--color-primary); background: var(--color-muted-bg); border-bottom-color: var(--color-primary); }
+.tab.active { color: var(--color-primary); background: #eff6ff; border-bottom-color: var(--color-primary); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-lg); }
 table { width: 100%; border-collapse: collapse; }
-th { text-align: left; padding: 0.8rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--border); }
-td { padding: 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; }
-tbody tr:hover { background: #f8fafc; }
-.badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+th { text-align: left; padding: var(--space-sm); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); text-transform: uppercase; color: var(--color-text-secondary); border-bottom: 2px solid var(--color-border); }
+td { padding: var(--space-sm); font-size: var(--font-size-sm); vertical-align: middle; border-bottom: 1px solid var(--color-border); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--color-muted-bg); }
+.badge { display: inline-flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); text-transform: uppercase; letter-spacing: 0.03em; }
 .badge-open { background: #dcfce7; color: #166534; }
 .badge-claimed { background: #fef2f2; color: #991b1b; }
 .badge-resolved { background: #f1f5f9; color: #475569; }
 .badge-pending { background: #fef3c7; color: #92400e; }
 .badge-approved { background: #dcfce7; color: #166534; }
 .badge-declined { background: #fef2f2; color: #991b1b; }
-.search-box { position: relative; max-width: 480px; margin-bottom: 1.5rem; }
-.search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.8rem; border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem; background: var(--card); }
-.search-box input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-.search-results { margin-top: 1rem; padding: 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-.empty { text-align: center; color: var(--muted); padding: 2.5rem; border: 2px dashed var(--border); border-radius: 10px; background: #fafafa; }
+.search-box { position: relative; max-width: 480px; margin-bottom: var(--space-lg); }
+.search-box input { width: 100%; padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xl); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--font-size-base); background: var(--color-surface); }
+.search-box input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1); }
+.search-results { margin-top: var(--space-md); padding: var(--space-md); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); }
+.empty { text-align: center; color: var(--color-text-secondary); padding: var(--space-2xl); border: 2px dashed var(--color-border); border-radius: var(--radius); background: #fafafa; }
+.auth-page { max-width: 440px; margin: var(--space-2xl) auto; padding: 0 var(--space-lg); }
+.auth-card { padding: var(--space-xl); }
+.auth-switch { margin-top: var(--space-lg); text-align: center; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.auth-switch a { color: var(--color-primary); text-decoration: none; font-weight: var(--font-weight-semibold); cursor: pointer; }
+.auth-switch a:hover { text-decoration: underline; }
 .hidden { display: none !important; }
-@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .navbar { padding: 0 1rem; } main { padding: 0 1rem; } .card { padding: 1rem; } }
+.w-full { width: 100%; }
+.cursor-pointer { cursor: pointer; }
+.text-center { text-align: center; }
+@media (max-width: 640px) {
+  .form-row { grid-template-columns: 1fr; }
+  .navbar { padding: 0 var(--space-md); }
+  main { padding: var(--space-lg) var(--space-md); }
+  .card.p-lg { padding: var(--space-lg); }
+}
 </style>
 </head>
-<body><header>
+<body>
+<header>
   <div class="navbar">
     <div class="brand">Lost <span>&amp; Found</span></div>
     <div class="nav-links">
       <span id="header-user" class="user-info hidden"></span>
-      <a href="javascript:void(0)" class="btn btn-sm btn-outline hidden" id="header-logout">Logout</a>
+      <a href="#" class="btn btn-sm btn-outline hidden" id="header-logout">Logout</a>
     </div>
   </div>
 </header>
 <main>
   <div id="alert" class="alert"></div>
   <div id="page-login" class="page active">
-    <div style="max-width:440px;margin:4rem auto;padding:0 1rem;">
-      <div class="card" style="padding:2.5rem;">
-        <h2>Welcome back</h2>
+    <div class="auth-page">
+      <div class="card auth-card">
+        <h2>Sign in</h2>
         <form id="form-login">
-          <div class="form-group"><label>Username</label><input id="u-username" name="username" type="text" placeholder="Enter your username" required autocomplete="username"></div>
-          <div class="form-group"><label>Password</label><input id="u-password" name="password" type="password" placeholder="Enter your password" required autocomplete="current-password"></div>
+          <div class="form-group">
+            <label>Username</label>
+            <input id="u-username" name="username" type="text" placeholder="Enter your username" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input id="u-password" name="password" type="password" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
           <button type="submit" class="btn btn-primary w-full">Sign in</button>
         </form>
-        <div style="margin-top:1.25rem;text-align:center;font-size:0.9rem;color:var(--muted);">Don't have an account? <span id="link-to-signup" class="cursor-pointer">Create an account</span></div>
+        <div class="auth-switch">
+          Don't have an account? <span id="link-to-signup" class="cursor-pointer">Create an account</span>
+        </div>
       </div>
     </div>
   </div>
   <div id="page-signup" class="page">
-    <div style="max-width:440px;margin:4rem auto;padding:0 1rem;">
-      <div class="card" style="padding:2.5rem;">
+    <div class="auth-page">
+      <div class="card auth-card">
         <h2>Create an account</h2>
         <form id="form-signup">
-          <div class="form-group"><label>Username</label><input id="s-username" name="username" type="text" placeholder="Choose a username" required></div>
-          <div class="form-row">
-            <div class="form-group"><label>ID number (optional)</label><input id="s-id" name="id" type="text" placeholder="e.g. ST-2024-001"></div>
-            <div class="form-group"><label>Role</label><select id="s-role" name="role"><option value="Normal_User">Normal User</option><option value="Management">Management</option></select></div>
+          <div class="form-group">
+            <label>Username</label>
+            <input id="s-username" name="username" type="text" placeholder="Choose a username" required>
           </div>
-          <div class="form-group"><label>Password</label><input id="s-password" name="password" type="password" placeholder="Choose a password" required></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>ID number (optional)</label>
+              <input id="s-id" name="id" type="text" placeholder="e.g. ST-2024-001">
+            </div>
+            <div class="form-group">
+              <label>Role</label>
+              <select id="s-role" name="role">
+                <option value="Normal_User">Normal User</option>
+                <option value="Management">Management</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input id="s-password" name="password" type="password" placeholder="Choose a password" required>
+          </div>
           <button type="submit" class="btn btn-primary w-full">Create account</button>
         </form>
-        <div style="margin-top:1.25rem;text-align:center;font-size:0.9rem;color:var(--muted);">Already have an account? <span id="link-to-login" class="cursor-pointer">Sign in</span></div>
+        <div class="auth-switch">
+          Already have an account? <span id="link-to-login" class="cursor-pointer">Sign in</span>
+        </div>
       </div>
     </div>
   </div>
   <div id="page-app" class="page">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-      <div><span id="app-user" class="user-info" style="font-weight:700;"></span></div>
-      <a href="javascript:void(0)" id="app-logout" class="btn btn-secondary btn-sm">Logout</a>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-md);">
+      <div>
+        <span id="app-user" class="user-info" style="font-weight:var(--font-weight-semibold);"></span>
+      </div>
+      <a href="#" id="app-logout" class="btn btn-secondary btn-sm">Logout</a>
     </div>
     <div class="tabs">
       <span class="tab active" onclick="tab('lost')">Lost Items</span>
@@ -128,17 +190,35 @@ tbody tr:hover { background: #f8fafc; }
     </div>
     <div id="tab-claims" class="tab-content"></div>
     <div id="tab-management" class="tab-content"></div>
-    <div class="card">
+    <div class="card p-lg">
       <h3>Report a lost or found item</h3>
       <form id="form-report">
         <div class="form-row">
-          <div class="form-group"><label>Item name</label><input id="r-name" name="name" type="text" placeholder="e.g. Black umbrella" required></div>
-          <div class="form-group"><label>Type</label><select id="r-type" name="type" required><option value="lost">Lost Item</option><option value="found">Found Item</option></select></div>
+          <div class="form-group">
+            <label>Item name</label>
+            <input id="r-name" name="name" type="text" placeholder="e.g. Black umbrella" required>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="r-type" name="type" required>
+              <option value="lost">Lost Item</option>
+              <option value="found">Found Item</option>
+            </select>
+          </div>
         </div>
-        <div class="form-group"><label>Description</label><input id="r-desc" name="description" type="text" placeholder="Brief description of the item" required></div>
+        <div class="form-group">
+          <label>Description</label>
+          <input id="r-desc" name="description" type="text" placeholder="Brief description of the item" required>
+        </div>
         <div class="form-row">
-          <div class="form-group"><label>Date</label><input id="r-date" name="date" type="date" required></div>
-          <div class="form-group"><label>Location</label><input id="r-loc" name="location" type="text" placeholder="Where was it lost or found?" required></div>
+          <div class="form-group">
+            <label>Date</label>
+            <input id="r-date" name="date" type="date" required>
+          </div>
+          <div class="form-group">
+            <label>Location</label>
+            <input id="r-loc" name="location" type="text" placeholder="Where was it lost or found?" required>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary">Report Item</button>
       </form>
@@ -150,30 +230,236 @@ const API = '/api';
 const $ = id => document.getElementById(id);
 function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); $(id).classList.add('active'); }
 function setAlert(text, type) { const a = $('alert'); a.textContent = text; a.className = 'alert ' + (type === 'success' ? 'alert-success' : 'alert-error') + ' show'; setTimeout(() => a.classList.remove('show'), 5000); }
-function setAuthUI(authenticated, user) { var login = $('page-login'); var signup = $('page-signup'); var app = $('page-app'); var headerUser = $('header-user'); var headerLogout = $('header-logout'); if (authenticated) { login.classList.add('hidden'); signup.classList.add('hidden'); app.classList.remove('hidden'); $('app-user').textContent = 'Logged in as ' + user.username + ' (' + user.role + ')'; headerUser.textContent = user.username + ' (' + user.role + ')'; headerUser.classList.remove('hidden'); headerLogout.classList.remove('hidden'); if (user.role === 'Management') { $('mgmt-tab').classList.remove('hidden'); } loadItems('lost'); loadItems('found'); loadClaims(); if (user.role === 'Management') loadManagement(); } else { login.classList.remove('hidden'); login.classList.add('active'); signup.classList.add('hidden'); app.classList.add('hidden'); headerUser.classList.add('hidden'); headerLogout.classList.add('hidden'); } }
-async function api(path, opts) { opts = opts || {}; var r = await fetch(API + path, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts }); if (r.status === 401) { setAuthUI(false); throw new Error('auth'); } return r.json(); }
-var auth = { login: async function() { var fd = new FormData($('form-login')); try { var res = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }) }); setAuthUI(true, res.user); } catch (e) { setAlert('Invalid username or password.', 'error'); } }, signup: async function() { var fd = new FormData($('form-signup')); try { await api('/auth/signup', { method: 'POST', body: JSON.stringify({ username: fd.get('username'), id_number: fd.get('id') || null, role: fd.get('role'), password: fd.get('password') }) }); setAlert('Account created! You can now sign in.', 'success'); $('form-signup').reset(); showPage('page-login'); } catch (e) { setAlert('Signup failed. Username may already be taken.', 'error'); } }, logout: async function() { try { await api('/auth/logout', { method: 'POST' }); } catch (e) {} setAuthUI(false); showPage('page-login'); } };
+function setBtnLoading(btnId, loading) { const b = $(btnId); if (!b) return; if (loading) { b.classList.add('btn-loading'); b.disabled = true; } else { b.classList.remove('btn-loading'); b.disabled = false; } }
+function setAuthUI(authenticated, user) {
+  var login = $('page-login'); var signup = $('page-signup'); var app = $('page-app');
+  var headerUser = $('header-user'); var headerLogout = $('header-logout');
+  if (authenticated) {
+    login.classList.add('hidden'); signup.classList.add('hidden'); app.classList.remove('hidden');
+    $('app-user').textContent = 'Logged in as ' + user.username + ' (' + user.role + ')';
+    headerUser.textContent = user.username + ' (' + user.role + ')';
+    headerUser.classList.remove('hidden'); headerLogout.classList.remove('hidden');
+    if (user.role === 'Management') { $('mgmt-tab').classList.remove('hidden'); }
+    loadItems('lost'); loadItems('found'); loadClaims();
+    if (user.role === 'Management') loadManagement();
+  } else {
+    login.classList.remove('hidden'); login.classList.add('active');
+    signup.classList.add('hidden'); app.classList.add('hidden');
+    headerUser.classList.add('hidden'); headerLogout.classList.add('hidden');
+  }
+}
+async function api(path, opts) {
+  opts = opts || {};
+  var r = await fetch(API + path, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts });
+  if (r.status === 401) { setAuthUI(false); throw new Error('auth'); }
+  return r.json();
+}
+var auth = {
+  login: async function() {
+    var fd = new FormData($('form-login'));
+    setBtnLoading('form-login', true);
+    try {
+      var res = await api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
+      });
+      setAuthUI(true, res.user);
+      $('form-login').reset();
+    } catch (e) { setAlert('Invalid username or password.', 'error'); }
+    finally { setBtnLoading('form-login', false); }
+  },
+  signup: async function() {
+    var fd = new FormData($('form-signup'));
+    setBtnLoading('form-signup', true);
+    try {
+      await api('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ username: fd.get('username'), id_number: fd.get('id') || null, role: fd.get('role'), password: fd.get('password') }),
+      });
+      setAlert('Account created! You can now sign in.', 'success');
+      $('form-signup').reset();
+      showPage('page-login');
+    } catch (e) { setAlert('Signup failed. Username may already be taken.', 'error'); }
+    finally { setBtnLoading('form-signup', false); }
+  },
+  logout: async function() {
+    try { await api('/auth/logout', { method: 'POST' }); } catch (e) {}
+    setAuthUI(false);
+    showPage('page-login');
+  },
+};
 $('form-login').onsubmit = function(e) { e.preventDefault(); auth.login(); };
 $('form-signup').onsubmit = function(e) { e.preventDefault(); auth.signup(); };
 $('link-to-signup').onclick = function(e) { e.preventDefault(); showPage('page-signup'); };
 $('link-to-login').onclick = function(e) { e.preventDefault(); showPage('page-login'); };
 $('app-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
 $('header-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
-function tab(name) { document.querySelectorAll('.tab-content').forEach(function(el) { if (el.id !== 'tab-' + name) el.classList.add('hidden'); }); var target = $('tab-' + name); if (target) target.classList.remove('hidden'); if (name === 'lost') loadItems('lost'); if (name === 'found') loadItems('found'); if (name === 'claims') loadClaims(); if (name === 'management') loadManagement(); }
-async function loadItems(type) { try { var data = await api('/items/' + type); var items = data.items; var rows = items.map(function(it) { return '<tr>' + '<td><strong>' + escapeHtml(it.name) + '</strong></td>' + '<td>' + escapeHtml(it.description || '') + '</td>' + '<td>' + (it.item_date || '—') + '</td>' + '<td>' + escapeHtml(it.location || '—') + '</td>' + '<td><span class="badge badge-' + it.status.toLowerCase() + '">' + it.status + '</span></td>' + '<td>' + (it.status === 'Open' ? '<button class="btn btn-sm btn-primary" onclick="claimItem(\'' + type + '\', ' + it.item_id + ')">Claim</button>' : it.claimed_by ? '<span class="badge badge-claimed">Claimed</span>' : '<span class="badge badge-resolved">—</span>') + '</td>' + '</tr>'; }).join(''); var html = '<table>' + '<thead><tr><th>Item</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>' + '<tbody>' + (rows || '<tr><td colspan="6" class="empty">No items found.</td></tr>') + '</tbody>' + '</table>'; $('tab-' + type).innerHTML = html; } catch (e) { $('tab-' + type).innerHTML = '<div class="empty">Failed to load items.</div>'; } }
-async function claimItem(type, id) { if (!confirm('Claim this item?')) return; try { await api('/items/' + type + '/' + id + '/claim', { method: 'POST' }); loadItems(type); } catch (e) { setAlert('Could not claim item. It may already be taken.', 'error'); } }
-async function loadClaims() { try { var data = await api('/claims'); var pending = data.pending; var rows = pending.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td>' + escapeHtml(c.reason) + '</td>' + '<td><button class="btn btn-sm btn-outline" onclick="loadClaims()">Refresh</button></td>' + '</tr>'; }).join(''); $('tab-claims').innerHTML = '<h3>My claims</h3>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th></th></tr></thead>' + '<tbody>' + (rows || '<tr><td colspan="5" class="empty">No claims yet.</td></tr>') + '</tbody>' + '</table></div>'; } catch (e) { $('tab-claims').innerHTML = '<div class="empty">Failed to load claims.</div>'; } }
-async function loadManagement() { try { var data = await api('/claims'); var pending = data.pending; var history = data.history; var p = pending.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td>' + escapeHtml(c.reason) + '</td>' + '<td>' + '<button class="btn btn-sm btn-success" onclick="processClaim(' + c.id + ', \'approve\')">Approve</button> ' + '<button class="btn btn-sm btn-danger" onclick="processClaim(' + c.id + ', \'decline\')">Decline</button>' + '</td>' + '</tr>'; }).join(''); var h = history.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td><span class="badge badge-' + c.status.toLowerCase() + '">' + c.status + '</span></td>' + '<td>' + escapeHtml(c.manager_note || '') + '</td>' + '</tr>'; }).join(''); $('tab-management').innerHTML = '<h3>Management — Claim Requests</h3>' + '<div class="card" style="margin-bottom:1rem;">' + '<h4 style="margin-bottom:0.5rem;">Pending</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr></thead>' + '<tbody>' + (p || '<tr><td colspan="5" class="empty">No pending requests.</td></tr>') + '</tbody>' + '</table></div></div>' + '<h4 style="margin-bottom:0.5rem;">History</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr></thead>' + '<tbody>' + (h || '<tr><td colspan="5" class="empty">No history.</td></tr>') + '</tbody>' + '</table></div>'; } catch (e) { $('tab-management').innerHTML = '<div class="empty">Failed to load management view.</div>'; } }
-async function processClaim(id, action) { var note = prompt(action === 'approve' ? 'Enter approval note:' : 'Enter decline reason:'); if (note === null) return; try { await api('/claims/' + id + '/' + action, { method: 'POST', body: JSON.stringify({ manager_note: note || '' }) }); loadManagement(); loadItems('lost'); loadItems('found'); } catch (e) { setAlert('Failed to process claim.', 'error'); } }
-async function doSearch() { var q = $('search-q').value.trim(); if (!q) { $('search-results').innerHTML = ''; return; } try { var data = await api('/search?q=' + encodeURIComponent(q)); var lost = data.results.lost.map(function(i) { return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); var found = data.results.found.map(function(i) { return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); $('search-results').innerHTML = '<strong>Lost items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + lost || '<li>none</li>' + '</ul>' + '<strong style="margin-top:1rem;display:block;">Found items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + found || '<li>none</li>' + '</ul>'; } catch (e) { $('search-results').innerHTML = '<div class="empty">Search failed.</div>'; } }
-var searchTimer; function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); }
-$('form-report').onsubmit = async function(e) { e.preventDefault(); var fd = new FormData(e.target); var type = fd.get('type'); try { await api('/items/' + type, { method: 'POST', body: JSON.stringify({ name: fd.get('name'), description: fd.get('desc'), date: fd.get('date'), location: fd.get('loc') }) }); e.target.reset(); loadItems(type); setAlert('Item reported successfully.', 'success'); } catch (err) { setAlert('Failed to report item.', 'error'); } };
-function escapeHtml(t) { return String(t ?? '').replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; }); }
-var style = document.createElement('style'); style.textContent = '.btn-success { background: var(--success); color: #fff; } .btn-success:hover { background: #15803d; } .btn-danger { background: var(--danger); color: #fff; } .btn-danger:hover { background: #b91c1c; } .w-full { width: 100%; } .cursor-pointer { cursor: pointer; }'; document.head.appendChild(style);
-(async () => { try { var res = await api('/auth/me'); if (res.user) setAuthUI(true, res.user); else setAuthUI(false); } catch (e) { setAuthUI(false); } })();
+function tab(name) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { if (el.id !== 'tab-' + name) el.classList.add('hidden'); });
+  var target = $('tab-' + name); if (target) target.classList.remove('hidden');
+  if (name === 'lost') loadItems('lost');
+  if (name === 'found') loadItems('found');
+  if (name === 'claims') loadClaims();
+  if (name === 'management') loadManagement();
+}
+async function loadItems(type) {
+  try {
+    var data = await api('/items/' + type);
+    var items = data.items;
+    var rows = items.map(function(it) {
+      return '<tr>' +
+        '<td><strong>' + escapeHtml(it.name) + '</strong></td>' +
+        '<td>' + escapeHtml(it.description || '') + '</td>' +
+        '<td>' + (it.item_date || '—') + '</td>' +
+        '<td>' + escapeHtml(it.location || '—') + '</td>' +
+        '<td><span class="badge badge-' + it.status.toLowerCase() + '">' + it.status + '</span></td>' +
+        '<td>' +
+          (it.status === 'Open'
+            ? '<button class="btn btn-sm btn-primary" onclick="claimItem(\'' + type + '\', ' + it.item_id + ')">Claim</button>'
+            : it.claimed_by ? '<span class="badge badge-claimed">Claimed</span>' : '<span class="badge badge-resolved">—</span>'
+          ) +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    var html = '<table>' +
+      '<thead><tr><th>Item</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="6" class="empty">No items found.</td></tr>') + '</tbody>' +
+      '</table>';
+    $('tab-' + type).innerHTML = html;
+  } catch (e) { $('tab-' + type).innerHTML = '<div class="empty">Failed to load items.</div>'; }
+}
+async function claimItem(type, id) {
+  if (!confirm('Claim this item?')) return;
+  try {
+    await api('/items/' + type + '/' + id + '/claim', { method: 'POST' });
+    loadItems(type);
+  } catch (e) { setAlert('Could not claim item. It may already be taken.', 'error'); }
+}
+async function loadClaims() {
+  try {
+    var data = await api('/claims');
+    var pending = data.pending;
+    var rows = pending.map(function(c) {
+      return '<tr>' +
+        '<td>#' + c.id + '</td>' +
+        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
+        '<td>' + escapeHtml(c.requester) + '</td>' +
+        '<td>' + escapeHtml(c.reason) + '</td>' +
+        '<td><button class="btn btn-sm btn-outline" onclick="loadClaims()">Refresh</button></td>' +
+      '</tr>';
+    }).join('');
+    $('tab-claims').innerHTML = '<h3>My claims</h3>' +
+      '<div class="table-wrap">' +
+      '<table>' +
+      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th></th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="5" class="empty">No claims yet.</td></tr>') + '</tbody>' +
+      '</table></div>';
+  } catch (e) { $('tab-claims').innerHTML = '<div class="empty">Failed to load claims.</div>'; }
+}
+async function loadManagement() {
+  try {
+    var data = await api('/claims');
+    var pending = data.pending;
+    var history = data.history;
+    var p = pending.map(function(c) {
+      return '<tr>' +
+        '<td>#' + c.id + '</td>' +
+        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
+        '<td>' + escapeHtml(c.requester) + '</td>' +
+        '<td>' + escapeHtml(c.reason) + '</td>' +
+        '<td>' +
+          '<button class="btn btn-sm btn-success" onclick="processClaim(' + c.id + ', \'approve\')">Approve</button> ' +
+          '<button class="btn btn-sm btn-danger" onclick="processClaim(' + c.id + ', \'decline\')">Decline</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    var h = history.map(function(c) {
+      return '<tr>' +
+        '<td>#' + c.id + '</td>' +
+        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
+        '<td>' + escapeHtml(c.requester) + '</td>' +
+        '<td><span class="badge badge-' + c.status.toLowerCase() + '">' + c.status + '</span></td>' +
+        '<td>' + escapeHtml(c.manager_note || '') + '</td>' +
+      '</tr>';
+    }).join('');
+    $('tab-management').innerHTML = '<h3>Management — Claim Requests</h3>' +
+      '<div class="card p-lg" style="margin-bottom:var(--space-md);">' +
+      '<h4 style="margin-bottom:var(--space-sm);">Pending</h4>' +
+      '<div class="table-wrap">' +
+      '<table>' +
+      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr></thead>' +
+      '<tbody>' + (p || '<tr><td colspan="5" class="empty">No pending requests.</td></tr>') + '</tbody>' +
+      '</table></div></div>' +
+      '<h4 style="margin-bottom:var(--space-sm);">History</h4>' +
+      '<div class="table-wrap">' +
+      '<table>' +
+      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr></thead>' +
+      '<tbody>' + (h || '<tr><td colspan="5" class="empty">No history.</td></tr>') + '</tbody>' +
+      '</table></div>';
+  } catch (e) { $('tab-management').innerHTML = '<div class="empty">Failed to load management view.</div>'; }
+}
+async function processClaim(id, action) {
+  var note = prompt(action === 'approve' ? 'Enter approval note:' : 'Enter decline reason:');
+  if (note === null) return;
+  try {
+    await api('/claims/' + id + '/' + action, {
+      method: 'POST',
+      body: JSON.stringify({ manager_note: note || '' }),
+    });
+    loadManagement();
+    loadItems('lost');
+    loadItems('found');
+  } catch (e) { setAlert('Failed to process claim.', 'error'); }
+}
+async function doSearch() {
+  var q = $('search-q').value.trim();
+  if (!q) { $('search-results').innerHTML = ''; return; }
+  try {
+    var data = await api('/search?q=' + encodeURIComponent(q));
+    var lost = data.results.lost.map(function(i) {
+      return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>';
+    }).join('');
+    var found = data.results.found.map(function(i) {
+      return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>';
+    }).join('');
+    $('search-results').innerHTML =
+      '<strong>Lost items:</strong> <ul style="margin-left:var(--space-md);margin-top:var(--space-xs)">' + lost || '<li>none</li>' + '</ul>' +
+      '<strong style="margin-top:var(--space-md);display:block;">Found items:</strong> <ul style="margin-left:var(--space-md);margin-top:var(--space-xs)">' + found || '<li>none</li>' + '</ul>';
+  } catch (e) { $('search-results').innerHTML = '<div class="empty">Search failed.</div>'; }
+}
+var searchTimer;
+function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); }
+$('form-report').onsubmit = async function(e) {
+  e.preventDefault();
+  var fd = new FormData(e.target);
+  var type = fd.get('type');
+  setBtnLoading('form-report', true);
+  try {
+    await api('/items/' + type, {
+      method: 'POST',
+      body: JSON.stringify({ name: fd.get('name'), description: fd.get('desc'), date: fd.get('date'), location: fd.get('loc') }),
+    });
+    e.target.reset();
+    loadItems(type);
+    setAlert('Item reported successfully.', 'success');
+  } catch (err) { setAlert('Failed to report item.', 'error'); }
+  finally { setBtnLoading('form-report', false); }
+};
+function escapeHtml(t) {
+  return String(t ?? '').replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c];
+  });
+}
+var style = document.createElement('style');
+style.textContent = '.btn-success { background: var(--color-success); color: #fff; } .btn-success:hover:not(:disabled) { background: #15803d; } .btn-danger { background: var(--color-danger); color: #fff; } .btn-danger:hover:not(:disabled) { background: #b91c1c; } .w-full { width: 100%; } .cursor-pointer { cursor: pointer; }';
+document.head.appendChild(style);
+(async () => {
+  try {
+    var res = await api('/auth/me');
+    if (res.user) setAuthUI(true, res.user);
+    else setAuthUI(false);
+  } catch (e) { setAuthUI(false); }
+})();
 </script>
 </body>
 </html>
-
-
-
