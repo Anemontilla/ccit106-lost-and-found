@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+Ôªø<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lost &amp; Found ‚Äî team-dynamos.app</title>
+<title>Lost &amp; Found √¢‚Ç¨‚Äù team-dynamos.app</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root { --primary: #2563eb; --primary-hover: #1d4ed8; --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --success: #16a34a; --danger: #dc2626; }
@@ -83,8 +83,8 @@ tbody tr:hover { background: #f8fafc; }
       <div class="card" style="padding:2.5rem;">
         <h2>Welcome back</h2>
         <form id="form-login">
-          <div class="form-group"><label>Username</label><input id="u-username" type="text" placeholder="Enter your username" required autocomplete="username"></div>
-          <div class="form-group"><label>Password</label><input id="u-password" type="password" placeholder="Enter your password" required autocomplete="current-password"></div>
+          <div class="form-group"><label>Username</label><input id="u-username" name="username" type="text" placeholder="Enter your username" required autocomplete="username"></div>
+          <div class="form-group"><label>Password</label><input id="u-password" name="password" type="password" placeholder="Enter your password" required autocomplete="current-password"></div>
           <button type="submit" class="btn btn-primary w-full">Sign in</button>
         </form>
         <div style="margin-top:1.25rem;text-align:center;font-size:0.9rem;color:var(--muted);">Don't have an account? <span id="link-to-signup" class="cursor-pointer">Create an account</span></div>
@@ -96,12 +96,12 @@ tbody tr:hover { background: #f8fafc; }
       <div class="card" style="padding:2.5rem;">
         <h2>Create an account</h2>
         <form id="form-signup">
-          <div class="form-group"><label>Username</label><input id="s-username" type="text" placeholder="Choose a username" required></div>
+          <div class="form-group"><label>Username</label><input id="s-username" name="username" type="text" placeholder="Choose a username" required></div>
           <div class="form-row">
-            <div class="form-group"><label>ID number (optional)</label><input id="s-id" type="text" placeholder="e.g. ST-2024-001"></div>
-            <div class="form-group"><label>Role</label><select id="s-role"><option value="Normal_User">Normal User</option><option value="Management">Management</option></select></div>
+            <div class="form-group"><label>ID number (optional)</label><input id="s-id" name="id" type="text" placeholder="e.g. ST-2024-001"></div>
+            <div class="form-group"><label>Role</label><select id="s-role" name="role"><option value="Normal_User">Normal User</option><option value="Management">Management</option></select></div>
           </div>
-          <div class="form-group"><label>Password</label><input id="s-password" type="password" placeholder="Choose a password" required></div>
+          <div class="form-group"><label>Password</label><input id="s-password" name="password" type="password" placeholder="Choose a password" required></div>
           <button type="submit" class="btn btn-primary w-full">Create account</button>
         </form>
         <div style="margin-top:1.25rem;text-align:center;font-size:0.9rem;color:var(--muted);">Already have an account? <span id="link-to-login" class="cursor-pointer">Sign in</span></div>
@@ -132,13 +132,13 @@ tbody tr:hover { background: #f8fafc; }
       <h3>Report a lost or found item</h3>
       <form id="form-report">
         <div class="form-row">
-          <div class="form-group"><label>Item name</label><input id="r-name" type="text" placeholder="e.g. Black umbrella" required></div>
-          <div class="form-group"><label>Type</label><select id="r-type" required><option value="lost">Lost Item</option><option value="found">Found Item</option></select></div>
+          <div class="form-group"><label>Item name</label><input id="r-name" name="name" type="text" placeholder="e.g. Black umbrella" required></div>
+          <div class="form-group"><label>Type</label><select id="r-type" name="type" required><option value="lost">Lost Item</option><option value="found">Found Item</option></select></div>
         </div>
-        <div class="form-group"><label>Description</label><input id="r-desc" type="text" placeholder="Brief description of the item" required></div>
+        <div class="form-group"><label>Description</label><input id="r-desc" name="description" type="text" placeholder="Brief description of the item" required></div>
         <div class="form-row">
-          <div class="form-group"><label>Date</label><input id="r-date" type="date" required></div>
-          <div class="form-group"><label>Location</label><input id="r-loc" type="text" placeholder="Where was it lost or found?" required></div>
+          <div class="form-group"><label>Date</label><input id="r-date" name="date" type="date" required></div>
+          <div class="form-group"><label>Location</label><input id="r-loc" name="location" type="text" placeholder="Where was it lost or found?" required></div>
         </div>
         <button type="submit" class="btn btn-primary">Report Item</button>
       </form>
@@ -160,12 +160,12 @@ $('link-to-login').onclick = function(e) { e.preventDefault(); showPage('page-lo
 $('app-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
 $('header-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
 function tab(name) { document.querySelectorAll('.tab-content').forEach(function(el) { if (el.id !== 'tab-' + name) el.classList.add('hidden'); }); var target = $('tab-' + name); if (target) target.classList.remove('hidden'); if (name === 'lost') loadItems('lost'); if (name === 'found') loadItems('found'); if (name === 'claims') loadClaims(); if (name === 'management') loadManagement(); }
-async function loadItems(type) { try { var data = await api('/items/' + type); var items = data.items; var rows = items.map(function(it) { return '<tr>' + '<td><strong>' + escapeHtml(it.name) + '</strong></td>' + '<td>' + escapeHtml(it.description || '') + '</td>' + '<td>' + (it.item_date || 'ó') + '</td>' + '<td>' + escapeHtml(it.location || 'ó') + '</td>' + '<td><span class="badge badge-' + it.status.toLowerCase() + '">' + it.status + '</span></td>' + '<td>' + (it.status === 'Open' ? '<button class="btn btn-sm btn-primary" onclick="claimItem(\'' + type + '\', ' + it.item_id + ')">Claim</button>' : it.claimed_by ? '<span class="badge badge-claimed">Claimed</span>' : '<span class="badge badge-resolved">ó</span>') + '</td>' + '</tr>'; }).join(''); var html = '<table>' + '<thead><tr><th>Item</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>' + '<tbody>' + (rows || '<tr><td colspan="6" class="empty">No items found.</td></tr>') + '</tbody>' + '</table>'; $('tab-' + type).innerHTML = html; } catch (e) { $('tab-' + type).innerHTML = '<div class="empty">Failed to load items.</div>'; } }
+async function loadItems(type) { try { var data = await api('/items/' + type); var items = data.items; var rows = items.map(function(it) { return '<tr>' + '<td><strong>' + escapeHtml(it.name) + '</strong></td>' + '<td>' + escapeHtml(it.description || '') + '</td>' + '<td>' + (it.item_date || '‚Äî') + '</td>' + '<td>' + escapeHtml(it.location || '‚Äî') + '</td>' + '<td><span class="badge badge-' + it.status.toLowerCase() + '">' + it.status + '</span></td>' + '<td>' + (it.status === 'Open' ? '<button class="btn btn-sm btn-primary" onclick="claimItem(\'' + type + '\', ' + it.item_id + ')">Claim</button>' : it.claimed_by ? '<span class="badge badge-claimed">Claimed</span>' : '<span class="badge badge-resolved">‚Äî</span>') + '</td>' + '</tr>'; }).join(''); var html = '<table>' + '<thead><tr><th>Item</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>' + '<tbody>' + (rows || '<tr><td colspan="6" class="empty">No items found.</td></tr>') + '</tbody>' + '</table>'; $('tab-' + type).innerHTML = html; } catch (e) { $('tab-' + type).innerHTML = '<div class="empty">Failed to load items.</div>'; } }
 async function claimItem(type, id) { if (!confirm('Claim this item?')) return; try { await api('/items/' + type + '/' + id + '/claim', { method: 'POST' }); loadItems(type); } catch (e) { setAlert('Could not claim item. It may already be taken.', 'error'); } }
 async function loadClaims() { try { var data = await api('/claims'); var pending = data.pending; var rows = pending.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td>' + escapeHtml(c.reason) + '</td>' + '<td><button class="btn btn-sm btn-outline" onclick="loadClaims()">Refresh</button></td>' + '</tr>'; }).join(''); $('tab-claims').innerHTML = '<h3>My claims</h3>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th></th></tr></thead>' + '<tbody>' + (rows || '<tr><td colspan="5" class="empty">No claims yet.</td></tr>') + '</tbody>' + '</table></div>'; } catch (e) { $('tab-claims').innerHTML = '<div class="empty">Failed to load claims.</div>'; } }
-async function loadManagement() { try { var data = await api('/claims'); var pending = data.pending; var history = data.history; var p = pending.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td>' + escapeHtml(c.reason) + '</td>' + '<td>' + '<button class="btn btn-sm btn-success" onclick="processClaim(' + c.id + ', \'approve\')">Approve</button> ' + '<button class="btn btn-sm btn-danger" onclick="processClaim(' + c.id + ', \'decline\')">Decline</button>' + '</td>' + '</tr>'; }).join(''); var h = history.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td><span class="badge badge-' + c.status.toLowerCase() + '">' + c.status + '</span></td>' + '<td>' + escapeHtml(c.manager_note || '') + '</td>' + '</tr>'; }).join(''); $('tab-management').innerHTML = '<h3>Management ó Claim Requests</h3>' + '<div class="card" style="margin-bottom:1rem;">' + '<h4 style="margin-bottom:0.5rem;">Pending</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr></thead>' + '<tbody>' + (p || '<tr><td colspan="5" class="empty">No pending requests.</td></tr>') + '</tbody>' + '</table></div></div>' + '<h4 style="margin-bottom:0.5rem;">History</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr></thead>' + '<tbody>' + (h || '<tr><td colspan="5" class="empty">No history.</td></tr>') + '</tbody>' + '</table></div>'; } catch (e) { $('tab-management').innerHTML = '<div class="empty">Failed to load management view.</div>'; } }
+async function loadManagement() { try { var data = await api('/claims'); var pending = data.pending; var history = data.history; var p = pending.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td>' + escapeHtml(c.reason) + '</td>' + '<td>' + '<button class="btn btn-sm btn-success" onclick="processClaim(' + c.id + ', \'approve\')">Approve</button> ' + '<button class="btn btn-sm btn-danger" onclick="processClaim(' + c.id + ', \'decline\')">Decline</button>' + '</td>' + '</tr>'; }).join(''); var h = history.map(function(c) { return '<tr>' + '<td>#' + c.id + '</td>' + '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' + '<td>' + escapeHtml(c.requester) + '</td>' + '<td><span class="badge badge-' + c.status.toLowerCase() + '">' + c.status + '</span></td>' + '<td>' + escapeHtml(c.manager_note || '') + '</td>' + '</tr>'; }).join(''); $('tab-management').innerHTML = '<h3>Management ‚Äî Claim Requests</h3>' + '<div class="card" style="margin-bottom:1rem;">' + '<h4 style="margin-bottom:0.5rem;">Pending</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr></thead>' + '<tbody>' + (p || '<tr><td colspan="5" class="empty">No pending requests.</td></tr>') + '</tbody>' + '</table></div></div>' + '<h4 style="margin-bottom:0.5rem;">History</h4>' + '<div class="table-wrap">' + '<table>' + '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr></thead>' + '<tbody>' + (h || '<tr><td colspan="5" class="empty">No history.</td></tr>') + '</tbody>' + '</table></div>'; } catch (e) { $('tab-management').innerHTML = '<div class="empty">Failed to load management view.</div>'; } }
 async function processClaim(id, action) { var note = prompt(action === 'approve' ? 'Enter approval note:' : 'Enter decline reason:'); if (note === null) return; try { await api('/claims/' + id + '/' + action, { method: 'POST', body: JSON.stringify({ manager_note: note || '' }) }); loadManagement(); loadItems('lost'); loadItems('found'); } catch (e) { setAlert('Failed to process claim.', 'error'); } }
-async function doSearch() { var q = $('search-q').value.trim(); if (!q) { $('search-results').innerHTML = ''; return; } try { var data = await api('/search?q=' + encodeURIComponent(q)); var lost = data.results.lost.map(function(i) { return '<li>' + escapeHtml(i.name) + ' ó ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); var found = data.results.found.map(function(i) { return '<li>' + escapeHtml(i.name) + ' ó ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); $('search-results').innerHTML = '<strong>Lost items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + lost || '<li>none</li>' + '</ul>' + '<strong style="margin-top:1rem;display:block;">Found items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + found || '<li>none</li>' + '</ul>'; } catch (e) { $('search-results').innerHTML = '<div class="empty">Search failed.</div>'; } }
+async function doSearch() { var q = $('search-q').value.trim(); if (!q) { $('search-results').innerHTML = ''; return; } try { var data = await api('/search?q=' + encodeURIComponent(q)); var lost = data.results.lost.map(function(i) { return '<li>' + escapeHtml(i.name) + ' ‚Äî ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); var found = data.results.found.map(function(i) { return '<li>' + escapeHtml(i.name) + ' ‚Äî ' + escapeHtml(i.location) + ' (' + i.status + ')</li>'; }).join(''); $('search-results').innerHTML = '<strong>Lost items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + lost || '<li>none</li>' + '</ul>' + '<strong style="margin-top:1rem;display:block;">Found items:</strong> <ul style="margin-left:1.25rem;margin-top:0.25rem">' + found || '<li>none</li>' + '</ul>'; } catch (e) { $('search-results').innerHTML = '<div class="empty">Search failed.</div>'; } }
 var searchTimer; function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); }
 $('form-report').onsubmit = async function(e) { e.preventDefault(); var fd = new FormData(e.target); var type = fd.get('type'); try { await api('/items/' + type, { method: 'POST', body: JSON.stringify({ name: fd.get('name'), description: fd.get('desc'), date: fd.get('date'), location: fd.get('loc') }) }); e.target.reset(); loadItems(type); setAlert('Item reported successfully.', 'success'); } catch (err) { setAlert('Failed to report item.', 'error'); } };
 function escapeHtml(t) { return String(t ?? '').replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; }); }
@@ -174,3 +174,6 @@ var style = document.createElement('style'); style.textContent = '.btn-success {
 </script>
 </body>
 </html>
+
+
+
