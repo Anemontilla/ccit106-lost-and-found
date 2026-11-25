@@ -9,15 +9,19 @@ router.get('/', requireLogin, async (req, res) => {
     const like = `%${q}%`;
     try {
         const [lost] = await db.query(
-            `SELECT item_id, name, location_lost AS location, status FROM lost_items
+            `SELECT item_id, name, description, location_lost AS location, date_lost AS item_date, status,
+                    (image_data IS NOT NULL) AS has_image
+             FROM lost_items
              WHERE (name LIKE ? OR description LIKE ? OR location_lost LIKE ?)
-             AND status != 'Resolved' ORDER BY created_at DESC LIMIT 5`,
+             ORDER BY created_at DESC LIMIT 50`,
             [like, like, like]
         );
         const [found] = await db.query(
-            `SELECT item_id, name, location_found AS location, status FROM found_items
+            `SELECT item_id, name, description, location_found AS location, date_found AS item_date, status,
+                    (image_data IS NOT NULL) AS has_image
+             FROM found_items
              WHERE (name LIKE ? OR description LIKE ? OR location_found LIKE ?)
-             AND status != 'Resolved' ORDER BY created_at DESC LIMIT 5`,
+             ORDER BY created_at DESC LIMIT 50`,
             [like, like, like]
         );
         res.json({ results: { lost, found } });

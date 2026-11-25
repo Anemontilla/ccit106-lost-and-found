@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   id_number VARCHAR(20) UNIQUE,
   role ENUM('Management', 'Normal_User') NOT NULL DEFAULT 'Normal_User',
   is_staff TINYINT(1) NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -22,6 +23,8 @@ CREATE TABLE IF NOT EXISTS lost_items (
   date_lost DATE,
   location_lost VARCHAR(100),
   image VARCHAR(255),
+  image_data MEDIUMBLOB NULL,
+  image_mime_type VARCHAR(50) NULL,
   status ENUM('Open', 'Claimed', 'Resolved') NOT NULL DEFAULT 'Open',
   reported_by INT NULL,
   claimed_by INT NULL,
@@ -37,6 +40,8 @@ CREATE TABLE IF NOT EXISTS found_items (
   date_found DATE,
   location_found VARCHAR(100),
   image VARCHAR(255),
+  image_data MEDIUMBLOB NULL,
+  image_mime_type VARCHAR(50) NULL,
   status ENUM('Open', 'Claimed', 'Resolved') NOT NULL DEFAULT 'Open',
   reported_by INT NULL,
   claimed_by INT NULL,

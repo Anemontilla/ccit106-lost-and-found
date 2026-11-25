@@ -1,248 +1,581 @@
-const API = '/api';
-const $ = id => document.getElementById(id);
-function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); $(id).classList.remove('hidden'); $(id).classList.add('active'); }
-function setAlert(text, type) { const a = $('alert'); a.textContent = text; a.className = 'alert ' + (type === 'success' ? 'alert-success' : 'alert-error') + ' show'; setTimeout(() => a.classList.remove('show'), 5000); }
-function setBtnLoading(btnId, loading) { const b = $(btnId); if (!b) return; if (loading) { b.classList.add('btn-loading'); b.disabled = true; } else { b.classList.remove('btn-loading'); b.disabled = false; } }
-function setAuthUI(authenticated, user) {
-  var login = $('page-login'); var signup = $('page-signup'); var app = $('page-app');
-  var headerUser = $('header-user'); var headerLogout = $('header-logout');
-  if (authenticated) {
-    login.classList.remove('active'); signup.classList.remove('active');
-    login.classList.add('hidden'); signup.classList.add('hidden');
-    app.classList.remove('hidden'); app.classList.add('active');
-    $('app-user').textContent = 'Logged in as ' + user.username + ' (' + user.role + ')';
-    headerUser.textContent = user.username + ' (' + user.role + ')';
-    headerUser.classList.remove('hidden'); headerLogout.classList.remove('hidden');
-    if (user.role === 'Management') { $('mgmt-tab').classList.remove('hidden'); }
-    tab('lost');
-  } else {
-    app.classList.remove('active');
-    login.classList.remove('hidden'); login.classList.add('active');
-    signup.classList.remove('active'); signup.classList.add('hidden'); app.classList.add('hidden');
-    headerUser.classList.add('hidden'); headerLogout.classList.add('hidden');
+(function () {
+  'use strict';
+
+  const API = '/api';
+  const authView = document.getElementById('auth-view');
+  const appView = document.getElementById('app-view');
+  const pageContent = document.getElementById('page-content');
+  const sidebar = document.getElementById('appSidebar');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const mobileToggle = document.getElementById('mobileMenuToggle');
+  const reportModal = document.getElementById('report-modal');
+  let currentUser = null;
+  let currentPage = 'home';
+  let currentFilter = 'all';
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[char];
+    });
   }
-}
-async function api(path, opts) {
-  opts = opts || {};
-  var r = await fetch(API + path, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts });
-  if (r.status === 401) { setAuthUI(false); throw new Error('auth'); }
-  return r.json();
-}
-var auth = {
-  login: async function() {
-    var fd = new FormData($('form-login'));
-    setBtnLoading('form-login', true);
+
+  async function api(path, options) {
+    const opts = options || {};
+    const headers = { ...opts.headers };
+    if (opts.body && !(opts.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(API + path, {
+      credentials: 'include',
+      ...opts,
+      headers,
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json()
+      : null;
+
+    if (response.status === 401 && path !== '/auth/login') {
+      showAuth('login');
+    }
+    if (!response.ok) {
+      throw new Error(data && data.error ? data.error : 'Request failed. Please try again.');
+    }
+    return data;
+  }
+
+  function showAlert(message, type) {
+    const wrapper = currentUser
+      ? document.getElementById('alerts-wrapper')
+      : document.getElementById('auth-notice');
+    const alert = document.createElement('div');
+    alert.className = 'alert ' + (type === 'error' ? 'alert-error' : 'alert-success');
+    alert.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    alert.textContent = message;
+    wrapper.replaceChildren(alert);
+    window.setTimeout(function () {
+      if (alert.isConnected) alert.remove();
+    }, 5200);
+  }
+
+  function showAuth(panel) {
+    currentUser = null;
+    appView.hidden = true;
+    authView.hidden = false;
+    document.body.classList.add('auth-body');
+    document.getElementById('login-panel').hidden = panel !== 'login';
+    document.getElementById('signup-panel').hidden = panel !== 'signup';
+    closeSidebar();
+  }
+
+  function showApp(user) {
+    currentUser = user;
+    authView.hidden = true;
+    appView.hidden = false;
+    document.body.classList.remove('auth-body');
+    document.getElementById('user-avatar').textContent = user.username.slice(0, 1).toUpperCase();
+    document.getElementById('sidebar-username').textContent = user.username;
+    document.getElementById('sidebar-role').textContent =
+      user.role === 'Management' || user.is_staff ? 'Management' : 'Student';
+    document.getElementById('management-link').hidden =
+      user.role !== 'Management' && !user.is_staff;
+    document.getElementById('nav-section-primary').textContent =
+      user.role === 'Management' || user.is_staff ? 'Management' : 'Campus';
+    document.getElementById('auth-notice').replaceChildren();
+    currentPage = 'home';
+    renderPage(currentPage);
+  }
+
+  function closeSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.remove('is-open');
+    sidebarOverlay.hidden = true;
+    sidebarOverlay.classList.remove('is-open');
+    document.body.classList.remove('nav-lock');
+    mobileToggle.setAttribute('aria-expanded', 'false');
+  }
+
+  function openReport(type) {
+    const form = document.getElementById('report-form');
+    form.reset();
+    document.getElementById('report-type').value = type;
+    document.getElementById('report-title').textContent =
+      type === 'lost' ? 'Report a lost item' : 'Report a found item';
+    document.getElementById('report-error').hidden = true;
+    document.getElementById('report-preview').hidden = true;
+    reportModal.hidden = false;
+    reportModal.classList.add('is-open');
+    document.body.classList.add('nav-lock');
+    document.getElementById('report-name').focus();
+  }
+
+  function closeReport() {
+    reportModal.classList.remove('is-open');
+    reportModal.hidden = true;
+    document.body.classList.remove('nav-lock');
+    const preview = document.getElementById('report-preview');
+    preview.removeAttribute('src');
+  }
+
+  function pageError(error) {
+    pageContent.innerHTML =
+      '<section class="panel"><div class="empty-state">' +
+      '<h2 class="empty-state-title">Could not load this page</h2>' +
+      '<p class="empty-state-text">' + escapeHtml(error.message) + '</p>' +
+      '</div></section>';
+  }
+
+  function pageIntro(kicker, title, description, type) {
+    return '<header class="page-intro">' +
+      '<div><p class="eyebrow">' + kicker + '</p><h1>' + title + '</h1>' +
+      '<p class="lede">' + description + '</p></div>' +
+      (type ? '<button type="button" class="btn btn-primary btn-sm" data-action="report" data-type="' + type + '">' +
+        'Report ' + type + ' item</button>' : '') +
+      '</header>';
+  }
+
+  function displayDate(value) {
+    return escapeHtml(value).split('T')[0];
+  }
+
+  function emptyState(title, message, action) {
+    return '<section class="panel"><div class="empty-state">' +
+      '<div class="empty-orb" aria-hidden="true"></div>' +
+      '<h2 class="empty-state-title">' + title + '</h2>' +
+      '<p class="empty-state-text">' + message + '</p>' +
+      (action || '') +
+      '</div></section>';
+  }
+
+  function itemCard(type, item) {
+    const status = String(item.status || 'Open').toLowerCase();
+    const image = item.has_image
+      ? '<img src="' + API + '/items/' + type + '/' + Number(item.item_id) + '/image" alt="' + escapeHtml(item.name) + '" class="item-card-image">'
+      : '<div class="item-card-image-placeholder"><span>No photo</span></div>';
+    let action = '<p class="footer-note">This item has been resolved.</p>';
+    if (item.status === 'Open') {
+      action = '<button type="button" class="btn btn-primary" data-action="claim" data-type="' + type +
+        '" data-id="' + Number(item.item_id) + '">Claim item</button>';
+    } else if (item.status === 'Claimed' && isManagement()) {
+      action = '<button type="button" class="btn btn-success" data-action="resolve" data-type="' + type +
+        '" data-id="' + Number(item.item_id) + '">Mark resolved</button>';
+    } else if (item.status === 'Claimed') {
+      action = '<p class="footer-note">Waiting for management to verify this claim.</p>';
+    }
+
+    return '<article class="item-card" data-status="' + status + '">' +
+      '<div class="item-media">' + image +
+      '<span class="badge badge-' + status + '">' + escapeHtml(item.status) + '</span></div>' +
+      '<div class="item-card-body">' +
+      '<h2 class="item-card-name">' + escapeHtml(item.name) + '</h2>' +
+      '<p class="item-card-desc">' + escapeHtml(item.description) + '</p>' +
+      '<div class="item-card-meta"><span class="meta-chip">' + escapeHtml(item.location) +
+      '</span><span class="meta-chip">' + (type === 'lost' ? 'Lost ' : 'Found ') +
+      displayDate(item.item_date) + '</span></div>' +
+      (item.claimed_by_username ? '<p class="item-claimer">Claimed by ' +
+        escapeHtml(item.claimed_by_username) + '</p>' : '') +
+      '</div><div class="item-card-footer">' + action + '</div></article>';
+  }
+
+  function isManagement() {
+    return currentUser && (currentUser.role === 'Management' || currentUser.is_staff);
+  }
+
+  async function loadItems(type) {
+    const data = await api('/items/' + type);
+    return data.items;
+  }
+
+  function filterControls() {
+    return '<div class="filters" data-filter-bar role="toolbar" aria-label="Filter by status">' +
+      '<button type="button" class="chip is-active" data-filter="all">All</button>' +
+      '<button type="button" class="chip" data-filter="open">Open</button>' +
+      '<button type="button" class="chip" data-filter="claimed">Claimed</button>' +
+      '<button type="button" class="chip" data-filter="resolved">Resolved</button></div>' +
+      '<p class="filter-empty" data-filter-empty hidden>No items with this status.</p>';
+  }
+
+  async function renderItemsPage(type) {
+    const label = type === 'lost' ? 'Lost' : 'Found';
+    const items = await loadItems(type);
+    currentFilter = 'all';
+    document.getElementById('topbar-title').textContent = label + ' items';
+    document.getElementById('topbar-actions').innerHTML = '';
+    pageContent.innerHTML = pageIntro(
+      'Discovery',
+      label + ' items',
+      type === 'lost'
+        ? 'Belongings students have reported missing. If one is yours, submit a claim.'
+        : 'Things turned in around campus. Recognize yours? Claim it and wait for verification.',
+      type
+    ) + (items.length
+      ? filterControls() + '<div class="items-grid" data-filter-group>' +
+        items.map(function (item) { return itemCard(type, item); }).join('') + '</div>'
+      : emptyState(
+        'No ' + type + ' items yet',
+        type === 'lost'
+          ? 'Be the first to report something missing on campus.'
+          : 'Found something on campus? Turn it in so the owner can claim it.',
+        '<button type="button" class="btn btn-primary" data-action="report" data-type="' + type + '">Report ' + type + ' item</button>'
+      ));
+  }
+
+  function recordRow(type, item) {
+    const dateLabel = type === 'lost' ? 'Lost' : 'Found';
+    return '<article class="record"><div><h3 class="record-title">' + escapeHtml(item.name) +
+      '</h3><p class="record-meta"><span>' + escapeHtml(item.location) + '</span><span>' +
+      dateLabel + ' ' + displayDate(item.item_date) + '</span></p></div><div class="record-tags">' +
+      '<span class="badge badge-' + type + '">' + type + '</span><span class="badge badge-' +
+      String(item.status).toLowerCase() + '">' + escapeHtml(item.status) +
+      '</span></div></article>';
+  }
+
+  async function renderUserHome() {
+    const [lost, found] = await Promise.all([loadItems('lost'), loadItems('found')]);
+    const ownLost = lost.filter(function (item) { return Number(item.reported_by) === Number(currentUser.id); });
+    const ownFound = found.filter(function (item) { return Number(item.reported_by) === Number(currentUser.id); });
+    const claims = lost.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); })
+      .concat(found.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); }));
+    document.getElementById('topbar-title').textContent = 'My desk';
+    document.getElementById('topbar-actions').innerHTML = '';
+
+    const reports = ownLost.map(function (item) { return recordRow('lost', item); })
+      .concat(ownFound.map(function (item) { return recordRow('found', item); })).join('');
+    const claimRows = claims.map(function (item) {
+      return '<article class="record"><div><h3 class="record-title">' + escapeHtml(item.name) +
+        '</h3><p class="record-meta">' +
+        (item.status === 'Resolved' ? 'Marked returned' : 'Waiting for management to verify') +
+        '</p></div><span class="badge badge-' + String(item.status).toLowerCase() + '">' +
+        escapeHtml(item.status) + '</span></article>';
+    }).join('');
+
+    pageContent.innerHTML =
+      '<section class="welcome"><div class="welcome-copy">' +
+      '<p class="eyebrow">Camarines Sur Polytechnic Colleges</p><h1>Hello, <em>' +
+      escapeHtml(currentUser.username) + '</em>.</h1>' +
+      '<p class="lede">Your reports and claims, kept in one place. Search covers lost and found items.</p>' +
+      '<form class="search-bar search-bar-lg" id="home-search-form" role="search">' +
+      '<span class="search-bar-icon" aria-hidden="true">⌕</span>' +
+      '<label class="visually-hidden" for="home-search">Search items</label>' +
+      '<input id="home-search" name="q" type="search" placeholder="Search items…">' +
+      '<button type="submit" class="btn btn-primary">Search</button></form>' +
+      '<div class="welcome-counts" aria-label="Your activity">' +
+      '<div><strong>' + ownLost.length + '</strong><span>Lost reports</span></div>' +
+      '<div><strong>' + ownFound.length + '</strong><span>Found reports</span></div>' +
+      '<div><strong>' + claims.length + '</strong><span>Claims</span></div></div></div>' +
+      '<figure class="welcome-plate"><img src="/img/cspc_campus.jpg" alt="CSPC Multi-Purpose Building I">' +
+      '<figcaption><span>Campus</span>Multi-Purpose Building I</figcaption></figure></section>' +
+      '<section class="capsules" aria-label="Quick actions">' +
+      '<button type="button" class="capsule capsule-deep" data-action="report" data-type="lost">' +
+      '<span class="capsule-kicker">Report</span><span class="capsule-title">I lost something</span></button>' +
+      '<button type="button" class="capsule capsule-mid" data-action="report" data-type="found">' +
+      '<span class="capsule-kicker">Turn in</span><span class="capsule-title">I found something</span></button>' +
+      '<a class="capsule capsule-ice" href="#" data-page="lost"><span class="capsule-kicker">Browse</span>' +
+      '<span class="capsule-title">Open the board</span></a></section>' +
+      '<div class="split"><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Items you reported</h2>' +
+      '<p class="panel-note">Lost and found reports attached to your account.</p></div></div>' +
+      (reports || '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
+        '<h3 class="empty-state-title">Nothing reported yet</h3>' +
+        '<p class="empty-state-text">When you report a lost or found item, it will show up here.</p></div>') +
+      '</section><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Your claims</h2>' +
+      '<p class="panel-note">Management verifies each claim before an item is returned.</p></div></div>' +
+      (claimRows || '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
+        '<h3 class="empty-state-title">No claims yet</h3>' +
+        '<p class="empty-state-text">If you recognize a belonging, claim it and track it here.</p></div>') +
+      '</section></div>';
+  }
+
+  async function renderManagement() {
+    const [lost, found] = await Promise.all([loadItems('lost'), loadItems('found')]);
+    const items = lost.map(function (item) { return { type: 'lost', item }; })
+      .concat(found.map(function (item) { return { type: 'found', item }; }));
+    const claimed = items.filter(function (entry) { return entry.item.status === 'Claimed'; });
+    const open = items.filter(function (entry) { return entry.item.status === 'Open'; });
+    const resolved = items.filter(function (entry) { return entry.item.status === 'Resolved'; });
+    document.getElementById('topbar-title').textContent = 'Management';
+    document.getElementById('topbar-actions').innerHTML = '';
+    pageContent.innerHTML =
+      '<section class="ops"><div class="ops-copy"><p class="eyebrow">Management desk</p>' +
+      (claimed.length
+        ? '<h1>' + claimed.length + ' claim' + (claimed.length === 1 ? '' : 's') + ' waiting.</h1>' +
+          '<p class="lede">Verify the claimant, hand the item over, then mark the record resolved.</p>'
+        : '<h1>The desk is clear.</h1><p class="lede">No claims are waiting. Counts below reflect live records.</p>') +
+      '<div class="ops-links"><a class="btn btn-primary" href="#" data-page="lost">Lost items</a>' +
+      '<a class="btn btn-secondary" href="#" data-page="found">Found items</a></div></div>' +
+      '<div class="meter" aria-label="System summary">' +
+      '<div class="meter-cell"><span class="meter-value">' + lost.length + '</span><span class="meter-label">Lost</span></div>' +
+      '<div class="meter-cell"><span class="meter-value">' + found.length + '</span><span class="meter-label">Found</span></div>' +
+      '<div class="meter-cell"><span class="meter-value">' + open.length + '</span><span class="meter-label">Open</span></div>' +
+      '<div class="meter-cell meter-cell-focus"><span class="meter-value">' + claimed.length + '</span><span class="meter-label">Pending</span></div>' +
+      '<div class="meter-cell"><span class="meter-value">' + resolved.length + '</span><span class="meter-label">Resolved</span></div>' +
+      '</div></section><section class="panel"><div class="panel-head"><div>' +
+      '<h2 class="panel-title">Claims awaiting verification</h2>' +
+      '<p class="panel-note">Resolve a claim only after the item has been returned.</p></div></div>' +
+      (claimed.length ? '<div class="record-scroll">' + claimed.map(function (entry) {
+        return '<article class="claim-row"><div><h3 class="record-title">' + escapeHtml(entry.item.name) +
+          ' <span class="badge badge-' + entry.type + '">' + entry.type + '</span></h3>' +
+          '<p class="record-meta"><span>Claimed by ' +
+          escapeHtml(entry.item.claimed_by_username || 'Unknown user') + '</span><span>' +
+          escapeHtml(entry.item.location) + '</span></p></div>' +
+          '<button type="button" class="btn btn-success" data-action="resolve" data-type="' +
+          entry.type + '" data-id="' + Number(entry.item.item_id) + '">Mark resolved</button></article>';
+      }).join('') + '</div>' :
+        '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
+        '<h3 class="empty-state-title">Nothing waiting</h3>' +
+        '<p class="empty-state-text">New claims will appear here as soon as a student claims an item.</p></div>') +
+      '</section>';
+  }
+
+  async function renderSearch(query) {
+    document.getElementById('topbar-title').textContent = 'Search';
+    document.getElementById('topbar-actions').innerHTML = '';
+    const safeQuery = escapeHtml(query || '');
+    let resultsMarkup = '<section class="panel search-idle"><div class="empty-state">' +
+      '<div class="empty-orb" aria-hidden="true"></div><h2 class="empty-state-title">Start with a word</h2>' +
+      '<p class="empty-state-text">Search looks through item names, descriptions and locations.</p></div></section>';
+    if (query) {
+      const data = await api('/search?q=' + encodeURIComponent(query));
+      const lost = data.results.lost || [];
+      const found = data.results.found || [];
+      const matches = lost.map(function (item) { return itemCard('lost', item); })
+        .concat(found.map(function (item) { return itemCard('found', item); })).join('');
+      resultsMarkup = matches
+        ? '<p class="lede">' + (lost.length + found.length) + ' matching item(s).</p><div class="items-grid">' + matches + '</div>'
+        : emptyState('No match for “' + safeQuery + '”', 'Try a shorter name, a detail, or a campus location.');
+    }
+    pageContent.innerHTML =
+      '<header class="page-intro page-intro-solo"><div><p class="eyebrow">Campus search</p>' +
+      '<h1>Search lost and found items.</h1><p class="lede">Look up a name, a detail from the description, or a location.</p></div></header>' +
+      '<form class="search-bar search-bar-lg" id="search-form" role="search">' +
+      '<label class="visually-hidden" for="search-query">Search items</label>' +
+      '<input id="search-query" name="q" type="search" value="' + safeQuery + '" placeholder="Search items…">' +
+      '<button type="submit" class="btn btn-primary">Search</button></form>' + resultsMarkup;
+  }
+
+  async function renderPage(page, query) {
+    if (!currentUser) return;
+    if (page === 'management' && !isManagement()) page = 'home';
+    currentPage = page;
+    document.querySelectorAll('[data-page]').forEach(function (link) {
+      link.classList.toggle('is-active', link.dataset.page === page);
+    });
+    closeSidebar();
+
     try {
-      var res = await api('/auth/login', {
+      if (page === 'lost' || page === 'found') await renderItemsPage(page);
+      else if (page === 'management') await renderManagement();
+      else if (page === 'search') await renderSearch(query || '');
+      else await renderUserHome();
+    } catch (error) {
+      pageError(error);
+    }
+  }
+
+  document.getElementById('login-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    const errorBox = document.getElementById('login-error');
+    errorBox.hidden = true;
+    button.disabled = true;
+    try {
+      const form = new FormData(event.currentTarget);
+      const data = await api('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
+        body: JSON.stringify({
+          identifier: form.get('identifier'),
+          password: form.get('password'),
+        }),
       });
-      setAuthUI(true, res.user);
-      $('form-login').reset();
-    } catch (e) { setAlert('Invalid username or password.', 'error'); }
-    finally { setBtnLoading('form-login', false); }
-  },
-  signup: async function() {
-    var fd = new FormData($('form-signup'));
-    setBtnLoading('form-signup', true);
+      showApp(data.user);
+      event.currentTarget.reset();
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.getElementById('signup-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    const errorBox = document.getElementById('signup-error');
+    errorBox.hidden = true;
+    button.disabled = true;
     try {
+      const form = new FormData(event.currentTarget);
       await api('/auth/signup', {
         method: 'POST',
-        body: JSON.stringify({ username: fd.get('username'), id_number: fd.get('id') || null, role: fd.get('role'), password: fd.get('password') }),
+        body: JSON.stringify({
+          username: form.get('username'),
+          id_number: form.get('id_number'),
+          password: form.get('password'),
+        }),
       });
-      setAlert('Account created! You can now sign in.', 'success');
-      $('form-signup').reset();
-      showPage('page-login');
-    } catch (e) { setAlert('Signup failed. Username may already be taken.', 'error'); }
-    finally { setBtnLoading('form-signup', false); }
-  },
-  logout: async function() {
-    try { await api('/auth/logout', { method: 'POST' }); } catch (e) {}
-    setAuthUI(false);
-    showPage('page-login');
-  },
-};
-$('form-login').onsubmit = function(e) { e.preventDefault(); auth.login(); };
-$('form-signup').onsubmit = function(e) { e.preventDefault(); auth.signup(); };
-$('link-to-signup').onclick = function(e) { e.preventDefault(); showPage('page-signup'); };
-$('link-to-login').onclick = function(e) { e.preventDefault(); showPage('page-login'); };
-$('app-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
-$('header-logout').onclick = function(e) { e.preventDefault(); auth.logout(); };
-document.querySelector('.tabs').addEventListener('click', function(e) {
-  var target = e.target.closest('[data-tab]');
-  if (target) tab(target.dataset.tab);
-});
-$('search-q').addEventListener('input', debouncedSearch);
-document.addEventListener('click', function(e) {
-  var button = e.target.closest('[data-action]');
-  if (!button) return;
-  if (button.dataset.action === 'claim-item') claimItem(button.dataset.type, button.dataset.id);
-  if (button.dataset.action === 'refresh-claims') loadClaims();
-  if (button.dataset.action === 'process-claim') processClaim(button.dataset.id, button.dataset.decision);
-});
-function tab(name) {
-  document.querySelectorAll('.tab-content').forEach(function(el) { if (el.id !== 'tab-' + name) el.classList.add('hidden'); });
-  var target = $('tab-' + name); if (target) target.classList.remove('hidden');
-  if (name === 'lost') loadItems('lost');
-  if (name === 'found') loadItems('found');
-  if (name === 'claims') loadClaims();
-  if (name === 'management') loadManagement();
-}
-async function loadItems(type) {
-  try {
-    var data = await api('/items/' + type);
-    var items = data.items;
-    var rows = items.map(function(it) {
-      return '<tr>' +
-        '<td><strong>' + escapeHtml(it.name) + '</strong></td>' +
-        '<td>' + escapeHtml(it.description || '') + '</td>' +
-        '<td>' + (it.item_date || '—') + '</td>' +
-        '<td>' + escapeHtml(it.location || '—') + '</td>' +
-        '<td><span class="badge badge-' + it.status.toLowerCase() + '">' + it.status + '</span></td>' +
-        '<td>' +
-          (it.status === 'Open'
-            ? '<button class="btn btn-sm btn-primary" data-action="claim-item" data-type="' + type + '" data-id="' + it.item_id + '">Claim</button>'
-            : it.claimed_by ? '<span class="badge badge-claimed">Claimed</span>' : '<span class="badge badge-resolved">—</span>'
-          ) +
-        '</td>' +
-      '</tr>';
-    }).join('');
-    var html = '<table>' +
-      '<thead><tr><th>Item</th><th>Description</th><th>Date</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>' +
-      '<tbody>' + (rows || '<tr><td colspan="6" class="empty">No items found.</td></tr>') + '</tbody>' +
-      '</table>';
-    $('tab-' + type).innerHTML = html;
-  } catch (e) { $('tab-' + type).innerHTML = '<div class="empty">Failed to load items.</div>'; }
-}
-async function claimItem(type, id) {
-  if (!confirm('Claim this item?')) return;
-  try {
-    await api('/items/' + type + '/' + id + '/claim', { method: 'POST' });
-    loadItems(type);
-  } catch (e) { setAlert('Could not claim item. It may already be taken.', 'error'); }
-}
-async function loadClaims() {
-  try {
-    var data = await api('/claims');
-    var pending = data.pending;
-    var rows = pending.map(function(c) {
-      return '<tr>' +
-        '<td>#' + c.id + '</td>' +
-        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
-        '<td>' + escapeHtml(c.requester) + '</td>' +
-        '<td>' + escapeHtml(c.reason) + '</td>' +
-        '<td><button class="btn btn-sm btn-outline" data-action="refresh-claims">Refresh</button></td>' +
-      '</tr>';
-    }).join('');
-    $('tab-claims').innerHTML = '<h3>My claims</h3>' +
-      '<div class="table-wrap">' +
-      '<table>' +
-      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th></th></tr></thead>' +
-      '<tbody>' + (rows || '<tr><td colspan="5" class="empty">No claims yet.</td></tr>') + '</tbody>' +
-      '</table></div>';
-  } catch (e) { $('tab-claims').innerHTML = '<div class="empty">Failed to load claims.</div>'; }
-}
-async function loadManagement() {
-  try {
-    var data = await api('/claims');
-    var pending = data.pending;
-    var history = data.history;
-    var p = pending.map(function(c) {
-      return '<tr>' +
-        '<td>#' + c.id + '</td>' +
-        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
-        '<td>' + escapeHtml(c.requester) + '</td>' +
-        '<td>' + escapeHtml(c.reason) + '</td>' +
-        '<td>' +
-          '<button class="btn btn-sm btn-success" data-action="process-claim" data-id="' + c.id + '" data-decision="approve">Approve</button> ' +
-          '<button class="btn btn-sm btn-danger" data-action="process-claim" data-id="' + c.id + '" data-decision="decline">Decline</button>' +
-        '</td>' +
-      '</tr>';
-    }).join('');
-    var h = history.map(function(c) {
-      return '<tr>' +
-        '<td>#' + c.id + '</td>' +
-        '<td>' + escapeHtml(c.item_type) + ' #' + c.item_id + '</td>' +
-        '<td>' + escapeHtml(c.requester) + '</td>' +
-        '<td><span class="badge badge-' + c.status.toLowerCase() + '">' + c.status + '</span></td>' +
-        '<td>' + escapeHtml(c.manager_note || '') + '</td>' +
-      '</tr>';
-    }).join('');
-    $('tab-management').innerHTML = '<h3>Management — Claim Requests</h3>' +
-      '<div class="card p-lg" style="margin-bottom:var(--space-md);">' +
-      '<h4 style="margin-bottom:var(--space-sm);">Pending</h4>' +
-      '<div class="table-wrap">' +
-      '<table>' +
-      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Reason</th><th>Action</th></tr></thead>' +
-      '<tbody>' + (p || '<tr><td colspan="5" class="empty">No pending requests.</td></tr>') + '</tbody>' +
-      '</table></div></div>' +
-      '<h4 style="margin-bottom:var(--space-sm);">History</h4>' +
-      '<div class="table-wrap">' +
-      '<table>' +
-      '<thead><tr><th>ID</th><th>Item</th><th>Requester</th><th>Status</th><th>Note</th></tr></thead>' +
-      '<tbody>' + (h || '<tr><td colspan="5" class="empty">No history.</td></tr>') + '</tbody>' +
-      '</table></div>';
-  } catch (e) { $('tab-management').innerHTML = '<div class="empty">Failed to load management view.</div>'; }
-}
-async function processClaim(id, action) {
-  var note = prompt(action === 'approve' ? 'Enter approval note:' : 'Enter decline reason:');
-  if (note === null) return;
-  try {
-    await api('/claims/' + id + '/' + action, {
-      method: 'POST',
-      body: JSON.stringify({ manager_note: note || '' }),
-    });
-    loadManagement();
-    loadItems('lost');
-    loadItems('found');
-  } catch (e) { setAlert('Failed to process claim.', 'error'); }
-}
-async function doSearch() {
-  var q = $('search-q').value.trim();
-  if (!q) { $('search-results').innerHTML = ''; return; }
-  try {
-    var data = await api('/search?q=' + encodeURIComponent(q));
-    var lost = data.results.lost.map(function(i) {
-      return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>';
-    }).join('');
-    var found = data.results.found.map(function(i) {
-      return '<li>' + escapeHtml(i.name) + ' — ' + escapeHtml(i.location) + ' (' + i.status + ')</li>';
-    }).join('');
-    $('search-results').innerHTML =
-      '<strong>Lost items:</strong> <ul style="margin-left:var(--space-md);margin-top:var(--space-xs)">' + lost || '<li>none</li>' + '</ul>' +
-      '<strong style="margin-top:var(--space-md);display:block;">Found items:</strong> <ul style="margin-left:var(--space-md);margin-top:var(--space-xs)">' + found || '<li>none</li>' + '</ul>';
-  } catch (e) { $('search-results').innerHTML = '<div class="empty">Search failed.</div>'; }
-}
-var searchTimer;
-function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 300); }
-$('form-report').onsubmit = async function(e) {
-  e.preventDefault();
-  var fd = new FormData(e.target);
-  var type = fd.get('type');
-  setBtnLoading('form-report', true);
-  try {
-    await api('/items/' + type, {
-      method: 'POST',
-      body: JSON.stringify({ name: fd.get('name'), description: fd.get('desc'), date: fd.get('date'), location: fd.get('loc') }),
-    });
-    e.target.reset();
-    loadItems(type);
-    setAlert('Item reported successfully.', 'success');
-  } catch (err) { setAlert('Failed to report item.', 'error'); }
-  finally { setBtnLoading('form-report', false); }
-};
-function escapeHtml(t) {
-  return String(t ?? '').replace(/[&<>"']/g, function(c) {
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c];
+      showAuth('login');
+      showAlert('Account created. You can now sign in with your ID number.', 'success');
+      document.getElementById('login-identifier').value = form.get('id_number');
+      event.currentTarget.reset();
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
   });
-}
-var style = document.createElement('style');
-style.textContent = '.btn-success { background: var(--color-success); color: #fff; } .btn-success:hover:not(:disabled) { background: #15803d; } .btn-danger { background: var(--color-danger); color: #fff; } .btn-danger:hover:not(:disabled) { background: #b91c1c; } .w-full { width: 100%; } .cursor-pointer { cursor: pointer; }';
-document.head.appendChild(style);
-(async () => {
-  try {
-    var res = await api('/auth/me');
-    if (res.user) setAuthUI(true, res.user);
-    else setAuthUI(false);
-  } catch (e) { setAuthUI(false); }
+
+  document.getElementById('report-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('[type="submit"]');
+    const errorBox = document.getElementById('report-error');
+    errorBox.hidden = true;
+    button.disabled = true;
+    try {
+      const type = document.getElementById('report-type').value;
+      await api('/items/' + type, { method: 'POST', body: new FormData(form) });
+      closeReport();
+      showAlert('Your item was reported.', 'success');
+      await renderPage(currentPage);
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.addEventListener('submit', function (event) {
+    const form = event.target;
+    if (form.id !== 'search-form' && form.id !== 'home-search-form') return;
+    event.preventDefault();
+    const query = new FormData(form).get('q').trim();
+    renderPage('search', query);
+  });
+
+  document.addEventListener('click', async function (event) {
+    const pageLink = event.target.closest('[data-page]');
+    if (pageLink) {
+      event.preventDefault();
+      renderPage(pageLink.dataset.page);
+      return;
+    }
+
+    const filterButton = event.target.closest('[data-filter]');
+    if (filterButton) {
+      currentFilter = filterButton.dataset.filter;
+      const bar = filterButton.closest('[data-filter-bar]');
+      bar.querySelectorAll('[data-filter]').forEach(function (button) {
+        button.classList.toggle('is-active', button === filterButton);
+      });
+      const group = document.querySelector('[data-filter-group]');
+      let shown = 0;
+      group.querySelectorAll('[data-status]').forEach(function (card) {
+        const match = currentFilter === 'all' || card.dataset.status === currentFilter;
+        card.classList.toggle('is-filtered-out', !match);
+        if (match) shown += 1;
+      });
+      const empty = document.querySelector('[data-filter-empty]');
+      if (empty) empty.hidden = shown !== 0;
+      return;
+    }
+
+    const action = event.target.closest('[data-action]');
+    if (!action) return;
+    if (action.dataset.action === 'show-signup') return showAuth('signup');
+    if (action.dataset.action === 'show-login') return showAuth('login');
+    if (action.dataset.action === 'report') return openReport(action.dataset.type);
+    if (action.dataset.action === 'close-report') return closeReport();
+    if (action.dataset.action === 'logout') {
+      try {
+        await api('/auth/logout', { method: 'POST' });
+      } catch (error) {
+        showAlert(error.message, 'error');
+      } finally {
+        showAuth('login');
+      }
+      return;
+    }
+    if (action.dataset.action === 'claim') {
+      if (!window.confirm('Claim this item? Management will verify the claim.')) return;
+      try {
+        await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/claim', { method: 'POST' });
+        showAlert('Claim submitted. Management will verify the item.', 'success');
+        await renderPage(currentPage);
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+      return;
+    }
+    if (action.dataset.action === 'resolve') {
+      if (!window.confirm('Mark this item as returned and resolved?')) return;
+      try {
+        await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/resolve', { method: 'POST' });
+        showAlert('Item marked as resolved.', 'success');
+        await renderPage(currentPage);
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+    }
+  });
+
+  document.getElementById('report-image').addEventListener('change', function (event) {
+    const file = event.target.files && event.target.files[0];
+    const preview = document.getElementById('report-preview');
+    const errorBox = document.getElementById('report-error');
+    if (!file) {
+      preview.hidden = true;
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      event.target.value = '';
+      errorBox.textContent = 'Image must be 5 MB or smaller.';
+      errorBox.hidden = false;
+      preview.hidden = true;
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+      event.target.value = '';
+      errorBox.textContent = 'Only JPEG, PNG, GIF or WebP images are allowed.';
+      errorBox.hidden = false;
+      preview.hidden = true;
+      return;
+    }
+    errorBox.hidden = true;
+    preview.src = URL.createObjectURL(file);
+    preview.hidden = false;
+  });
+
+  mobileToggle.addEventListener('click', function () {
+    sidebar.classList.add('is-open');
+    sidebarOverlay.hidden = false;
+    sidebarOverlay.classList.add('is-open');
+    document.body.classList.add('nav-lock');
+    mobileToggle.setAttribute('aria-expanded', 'true');
+  });
+  sidebarOverlay.addEventListener('click', closeSidebar);
+  reportModal.addEventListener('click', function (event) {
+    if (event.target === reportModal) closeReport();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      closeReport();
+      closeSidebar();
+    }
+  });
+
+  api('/auth/me')
+    .then(function (data) {
+      showApp(data.user);
+    })
+    .catch(function () {
+      showAuth('login');
+    });
 })();

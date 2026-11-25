@@ -1,230 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Lost &amp; Found — report, search, and claim lost and found items.">
-<title>Lost &amp; Found — team-dynamos.app</title>
-<style>
-:root {
-  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px;
-  --color-bg: #f8fafc; --color-surface: #ffffff; --color-text: #0f172a; --color-text-secondary: #64748b;
-  --color-border: #e2e8f0; --color-primary: #2563eb; --color-primary-hover: #1d4ed8;
-  --color-success: #16a34a; --color-danger: #dc2626; --color-muted-bg: #f1f5f9;
-  --radius: 8px; --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --font-body: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem; --font-size-xl: 1.25rem; --font-size-2xl: 1.5rem;
-  --line-height-tight: 1.25; --line-height-normal: 1.5; --font-weight-medium: 500; --font-weight-semibold: 600;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body { font-family: var(--font-body); background: var(--color-bg); color: var(--color-text); line-height: var(--line-height-normal); font-size: var(--font-size-base); }
-header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 100; }
-.navbar { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; height: 64px; padding: 0 var(--space-lg); }
-.brand { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-primary); letter-spacing: -0.02em; }
-.brand span { color: var(--color-text); }
-.nav-links { display: flex; gap: var(--space-lg); align-items: center; }
-.nav-links a { color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.nav-links a:hover { color: var(--color-primary); }
-.user-info { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-main { max-width: 1200px; margin: 0 auto; padding: var(--space-xl) var(--space-lg); }
-.page { display: none; }
-.page.active { display: block; }
-.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.card.p-lg { padding: var(--space-xl); }
-h1 { font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-md); }
-h2 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-md); }
-h3 { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); color: var(--color-text); margin-bottom: var(--space-sm); }
-p { color: var(--color-text-secondary); margin-bottom: var(--space-md); }
-.form-group { margin-bottom: var(--space-md); }
-.form-group label { display: block; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text); margin-bottom: var(--space-xs); }
-.form-group input, .form-group select { width: 100%; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--font-size-base); background: var(--color-surface); transition: border-color 0.2s, box-shadow 0.2s; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius); border: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); cursor: pointer; transition: background 0.2s, opacity 0.2s; text-decoration: none; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary { background: var(--color-primary); color: #ffffff; }
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
-.btn-secondary { background: var(--color-muted-bg); color: var(--color-text); }
-.btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
-.btn-outline { background: transparent; color: var(--color-primary); border: 1px solid var(--color-primary); }
-.btn-outline:hover:not(:disabled) { background: rgb(37 99 235 / 0.05); }
-.btn-sm { padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-xs); }
-.btn-danger { background: var(--color-danger); color: #ffffff; }
-.btn-danger:hover:not(:disabled) { background: #b91c1c; }
-.btn-success { background: var(--color-success); color: #ffffff; }
-.btn-success:hover:not(:disabled) { background: #15803d; }
-.btn-loading { opacity: 0.7; cursor: not-allowed; }
-.btn-loading .btn-text { display: none; }
-.btn-loading .btn-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.alert { padding: var(--space-sm) var(--space-md); border-radius: var(--radius); font-size: var(--font-size-sm); margin-bottom: var(--space-md); display: none; }
-.alert.show { display: block; }
-.alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-.tabs { display: flex; gap: var(--space-xs); margin-bottom: var(--space-lg); border-bottom: 2px solid var(--color-border); padding-bottom: var(--space-sm); overflow-x: auto; }
-.tab { padding: var(--space-sm) var(--space-md); color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); border-radius: var(--radius) var(--radius) 0 0; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-.tab:hover { color: var(--color-primary); background: var(--color-muted-bg); border-bottom-color: var(--color-primary); }
-.tab.active { color: var(--color-primary); background: #eff6ff; border-bottom-color: var(--color-primary); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-lg); }
-table { width: 100%; border-collapse: collapse; }
-th { text-align: left; padding: var(--space-sm); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); text-transform: uppercase; color: var(--color-text-secondary); border-bottom: 2px solid var(--color-border); }
-td { padding: var(--space-sm); font-size: var(--font-size-sm); vertical-align: middle; border-bottom: 1px solid var(--color-border); }
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: var(--color-muted-bg); }
-.badge { display: inline-flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); text-transform: uppercase; letter-spacing: 0.03em; }
-.badge-open { background: #dcfce7; color: #166534; }
-.badge-claimed { background: #fef2f2; color: #991b1b; }
-.badge-resolved { background: #f1f5f9; color: #475569; }
-.badge-pending { background: #fef3c7; color: #92400e; }
-.badge-approved { background: #dcfce7; color: #166534; }
-.badge-declined { background: #fef2f2; color: #991b1b; }
-.search-box { position: relative; max-width: 480px; margin-bottom: var(--space-lg); }
-.search-box input { width: 100%; padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xl); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--font-size-base); background: var(--color-surface); }
-.search-box input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1); }
-.search-results { margin-top: var(--space-md); padding: var(--space-md); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); }
-.empty { text-align: center; color: var(--color-text-secondary); padding: var(--space-2xl); border: 2px dashed var(--color-border); border-radius: var(--radius); background: #fafafa; }
-.auth-page { max-width: 440px; margin: var(--space-2xl) auto; padding: 0 var(--space-lg); }
-.auth-card { padding: var(--space-xl); }
-.auth-switch { margin-top: var(--space-lg); text-align: center; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.auth-switch a { color: var(--color-primary); text-decoration: none; font-weight: var(--font-weight-semibold); cursor: pointer; }
-.auth-switch a:hover { text-decoration: underline; }
-.hidden { display: none !important; }
-.w-full { width: 100%; }
-.cursor-pointer { cursor: pointer; }
-.text-center { text-align: center; }
-@media (max-width: 640px) {
-  .form-row { grid-template-columns: 1fr; }
-  .navbar { padding: 0 var(--space-md); }
-  main { padding: var(--space-lg) var(--space-md); }
-  .card.p-lg { padding: var(--space-lg); }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CSPC Lost & Found — report, search and claim campus items.">
+  <title>Lost &amp; Found — CSPC</title>
+  <link rel="icon" href="/img/cspc_logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
-<header>
-  <div class="navbar">
-    <div class="brand">Lost <span>&amp; Found</span></div>
-    <div class="nav-links">
-      <span id="header-user" class="user-info hidden"></span>
-      <a href="#" class="btn btn-sm btn-outline hidden" id="header-logout">Logout</a>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="sidebar-overlay" id="sidebarOverlay" hidden></div>
+
+  <section class="auth-stage" id="auth-view">
+    <div class="auth-story" aria-label="About the system">
+      <img class="auth-photo" src="/img/cspc_campus.jpg" alt="CSPC Multi-Purpose Building I">
+      <div class="auth-veil"></div>
+      <div class="auth-story-inner">
+        <img class="auth-seal" src="/img/cspc_logo.png" alt="Camarines Sur Polytechnic Colleges seal">
+        <p class="eyebrow">Camarines Sur Polytechnic Colleges</p>
+        <h1>Lost on campus.<br>Found again.</h1>
+        <p class="lede">Report a missing belonging, turn in something you found, and follow a claim until it is back with its owner.</p>
+        <p class="auth-meta">Nabua, Camarines Sur · Est. 1983</p>
+      </div>
     </div>
-  </div>
-</header>
-<main>
-  <div id="alert" class="alert"></div>
-  <div id="page-login" class="page active">
-    <div class="auth-page">
-      <div class="card auth-card">
-        <h2>Sign in</h2>
-        <form id="form-login">
+
+    <div class="auth-panel">
+      <div class="auth-card" id="login-panel">
+        <p class="eyebrow">Student &amp; management access</p>
+        <h2 class="auth-title">Sign in</h2>
+        <p class="auth-subtitle">Use your registered ID number or username.</p>
+        <div class="alerts-wrapper" id="auth-notice" role="status" aria-live="polite"></div>
+        <div class="form-error-banner" id="login-error" role="alert" hidden></div>
+        <form id="login-form">
           <div class="form-group">
-            <label>Username</label>
-            <input id="u-username" name="username" type="text" placeholder="Enter your username" required autocomplete="username">
+            <label class="form-label" for="login-identifier">ID number or username</label>
+            <input id="login-identifier" name="identifier" type="text" maxlength="150" autocomplete="username" required>
           </div>
           <div class="form-group">
-            <label>Password</label>
-            <input id="u-password" name="password" type="password" placeholder="Enter your password" required autocomplete="current-password">
+            <label class="form-label" for="login-password">Password</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           </div>
-          <button type="submit" class="btn btn-primary w-full">Sign in</button>
+          <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
         </form>
-        <div class="auth-switch">
-          Don't have an account? <span id="link-to-signup" class="cursor-pointer">Create an account</span>
+        <p class="auth-footer-link">New to the desk? <button type="button" class="text-button" data-action="show-signup">Create an account</button></p>
+      </div>
+
+      <div class="auth-card auth-card-wide" id="signup-panel" hidden>
+        <p class="eyebrow">Registration</p>
+        <h2 class="auth-title">Create your account</h2>
+        <p class="auth-subtitle">Your ID number is what you will use to sign in.</p>
+        <div class="form-error-banner" id="signup-error" role="alert" hidden></div>
+        <form id="signup-form">
+          <div class="form-group">
+            <label class="form-label" for="signup-username">Username</label>
+            <input id="signup-username" name="username" type="text" maxlength="150" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signup-id-number">ID number</label>
+            <input id="signup-id-number" name="id_number" type="text" maxlength="20" autocomplete="off" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signup-password">Password</label>
+            <input id="signup-password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+            <div class="form-hint">Use at least 8 characters.</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
+        </form>
+        <p class="auth-footer-link">Already registered? <button type="button" class="text-button" data-action="show-login">Sign in</button></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="stage" id="app-view" hidden>
+    <div class="app-frame">
+      <aside class="sidebar" id="appSidebar">
+        <a class="brand" href="#" data-page="home">
+          <span class="brand-mark"><img src="/img/cspc_logo.png" alt=""></span>
+          <span class="brand-text">
+            <span class="brand-name">Lost &amp; Found</span>
+            <span class="brand-sub">CSPC · Nabua</span>
+          </span>
+        </a>
+        <nav class="sidebar-nav" id="sidebar-nav" aria-label="Main navigation">
+          <div class="sidebar-section-label" id="nav-section-primary">Campus</div>
+          <a class="sidebar-link" href="#" data-page="home">My desk</a>
+          <div class="sidebar-section-label">Discover</div>
+          <a class="sidebar-link" href="#" data-page="lost">Lost items</a>
+          <a class="sidebar-link" href="#" data-page="found">Found items</a>
+          <a class="sidebar-link" href="#" data-page="search">Search</a>
+          <a class="sidebar-link" href="#" data-page="management" id="management-link" hidden>Management overview</a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-avatar" id="user-avatar" aria-hidden="true"></div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name" id="sidebar-username"></div>
+              <div class="sidebar-user-role" id="sidebar-role"></div>
+            </div>
+          </div>
+          <button type="button" class="btn-logout" data-action="logout">Sign out</button>
         </div>
+      </aside>
+
+      <div class="main-wrapper">
+        <header class="topbar">
+          <button type="button" class="topbar-mobile-toggle" id="mobileMenuToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h12"/></svg>
+          </button>
+          <p class="topbar-title" id="topbar-title">My desk</p>
+          <div class="topbar-actions" id="topbar-actions"></div>
+        </header>
+        <main class="page-content" id="main">
+          <div class="alerts-wrapper" id="alerts-wrapper" role="status" aria-live="polite"></div>
+          <div id="page-content"></div>
+        </main>
+        <footer class="app-footer">
+          <span>CSPC Lost &amp; Found</span>
+          <span>Nabua, Camarines Sur</span>
+        </footer>
       </div>
     </div>
   </div>
-  <div id="page-signup" class="page">
-    <div class="auth-page">
-      <div class="card auth-card">
-        <h2>Create an account</h2>
-        <form id="form-signup">
+
+  <div class="modal-overlay" id="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">New report</p>
+          <h2 class="modal-title" id="report-title">Report an item</h2>
+        </div>
+        <button type="button" class="modal-close" data-action="close-report" aria-label="Close">×</button>
+      </div>
+      <form id="report-form" enctype="multipart/form-data">
+        <input type="hidden" name="type" id="report-type">
+        <div class="modal-body">
+          <div class="form-error-banner" id="report-error" role="alert" hidden></div>
           <div class="form-group">
-            <label>Username</label>
-            <input id="s-username" name="username" type="text" placeholder="Choose a username" required>
+            <label class="form-label" for="report-name">Item name</label>
+            <input id="report-name" name="name" type="text" maxlength="100" required>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>ID number (optional)</label>
-              <input id="s-id" name="id" type="text" placeholder="e.g. ST-2024-001">
+              <label class="form-label" for="report-date">Date</label>
+              <input id="report-date" name="date" type="date" required>
             </div>
             <div class="form-group">
-              <label>Role</label>
-              <select id="s-role" name="role">
-                <option value="Normal_User">Normal User</option>
-                <option value="Management">Management</option>
-              </select>
+              <label class="form-label" for="report-location">Location</label>
+              <input id="report-location" name="location" type="text" maxlength="100" required>
             </div>
           </div>
           <div class="form-group">
-            <label>Password</label>
-            <input id="s-password" name="password" type="password" placeholder="Choose a password" required>
-          </div>
-          <button type="submit" class="btn btn-primary w-full">Create account</button>
-        </form>
-        <div class="auth-switch">
-          Already have an account? <span id="link-to-login" class="cursor-pointer">Sign in</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="page-app" class="page">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-md);">
-      <div>
-        <span id="app-user" class="user-info" style="font-weight:var(--font-weight-semibold);"></span>
-      </div>
-      <a href="#" id="app-logout" class="btn btn-secondary btn-sm">Logout</a>
-    </div>
-    <div class="tabs">
-      <span class="tab active" data-tab="lost">Lost Items</span>
-      <span class="tab" data-tab="found">Found Items</span>
-      <span class="tab" data-tab="search">Search</span>
-      <span class="tab" data-tab="claims">My Claims</span>
-      <span id="mgmt-tab" class="tab hidden" data-tab="management">Management</span>
-    </div>
-    <div id="tab-lost" class="tab-content"></div>
-    <div id="tab-found" class="tab-content"></div>
-    <div id="tab-search" class="tab-content">
-      <div class="search-box"><input id="search-q" type="text" placeholder="Search lost &amp; found items..."></div>
-      <div id="search-results"></div>
-    </div>
-    <div id="tab-claims" class="tab-content"></div>
-    <div id="tab-management" class="tab-content"></div>
-    <div class="card p-lg">
-      <h3>Report a lost or found item</h3>
-      <form id="form-report">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Item name</label>
-            <input id="r-name" name="name" type="text" placeholder="e.g. Black umbrella" required>
+            <label class="form-label" for="report-description">Description</label>
+            <textarea id="report-description" name="description" required></textarea>
           </div>
           <div class="form-group">
-            <label>Type</label>
-            <select id="r-type" name="type" required>
-              <option value="lost">Lost Item</option>
-              <option value="found">Found Item</option>
-            </select>
+            <label class="form-label" for="report-image">Photo <span class="form-label-hint">optional, 5 MB max</span></label>
+            <input id="report-image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+            <img id="report-preview" class="upload-preview" alt="" hidden>
           </div>
         </div>
-        <div class="form-group">
-          <label>Description</label>
-          <input id="r-desc" name="description" type="text" placeholder="Brief description of the item" required>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-action="close-report">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit report</button>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Date</label>
-            <input id="r-date" name="date" type="date" required>
-          </div>
-          <div class="form-group">
-            <label>Location</label>
-            <input id="r-loc" name="location" type="text" placeholder="Where was it lost or found?" required>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Report Item</button>
       </form>
     </div>
   </div>
-</main>
-<script src="/app.js" defer></script>
 </body>
 </html>

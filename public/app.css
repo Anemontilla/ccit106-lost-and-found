@@ -1,0 +1,41 @@
+[hidden] {
+  display: none !important;
+}
+
+.text-button {
+  border: 0;
+  padding: 0;
+  color: var(--sky);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.capsule {
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-link.is-active {
+  color: white;
+  background: rgba(55, 129, 252, 0.16);
+  border-color: rgba(119, 191, 255, 0.2);
+}
+
+.alerts-wrapper:not(:empty) {
+  margin-bottom: 16px;
+}
+
+.upload-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  margin-top: 12px;
+  border-radius: 12px;
+}
