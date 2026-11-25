@@ -9,9 +9,24 @@
   const sidebarOverlay = document.getElementById('sidebarOverlay');
   const mobileToggle = document.getElementById('mobileMenuToggle');
   const reportModal = document.getElementById('report-modal');
+  const confirmDialog = document.getElementById('confirmDialog');
   let currentUser = null;
   let currentPage = 'home';
   let currentFilter = 'all';
+  let confirmationResolver = null;
+
+  function setTheme(theme) {
+    const activeTheme = theme === 'light' ? 'light' : 'dark';
+    document.body.dataset.theme = activeTheme;
+    document.querySelectorAll('[data-theme-choice]').forEach(function (button) {
+      const active = button.dataset.themeChoice === activeTheme;
+      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('is-selected', active);
+    });
+    window.localStorage.setItem('lost-found-theme', activeTheme);
+  }
+
+  setTheme(window.localStorage.getItem('lost-found-theme') || 'dark');
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
@@ -58,7 +73,11 @@
     const alert = document.createElement('div');
     alert.className = 'alert ' + (type === 'error' ? 'alert-error' : 'alert-success');
     alert.setAttribute('role', type === 'error' ? 'alert' : 'status');
-    alert.textContent = message;
+    alert.innerHTML = (type === 'error'
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>') +
+      '<span></span>';
+    alert.querySelector('span').textContent = message;
     wrapper.replaceChildren(alert);
     window.setTimeout(function () {
       if (alert.isConnected) alert.remove();
@@ -106,6 +125,7 @@
     const form = document.getElementById('report-form');
     form.reset();
     document.getElementById('report-type').value = type;
+    document.getElementById('upload-area-text').textContent = 'Drop a photo or click to browse';
     document.getElementById('report-title').textContent =
       type === 'lost' ? 'Report a lost item' : 'Report a found item';
     document.getElementById('report-error').hidden = true;
@@ -122,6 +142,34 @@
     document.body.classList.remove('nav-lock');
     const preview = document.getElementById('report-preview');
     preview.removeAttribute('src');
+    preview.hidden = true;
+    preview.classList.remove('is-visible');
+    document.getElementById('upload-area-text').textContent = 'Drop a photo or click to browse';
+  }
+
+  function finishConfirmation(confirmed) {
+    confirmDialog.classList.remove('is-open');
+    confirmDialog.hidden = true;
+    if (!document.querySelector('.modal-overlay.is-open, .sidebar.is-open')) {
+      document.body.classList.remove('nav-lock');
+    }
+    if (confirmationResolver) {
+      const resolve = confirmationResolver;
+      confirmationResolver = null;
+      resolve(confirmed);
+    }
+  }
+
+  function requestConfirmation(title, message) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    confirmDialog.hidden = false;
+    confirmDialog.classList.add('is-open');
+    document.body.classList.add('nav-lock');
+    document.getElementById('confirmProceed').focus();
+    return new Promise(function (resolve) {
+      confirmationResolver = resolve;
+    });
   }
 
   function pageError(error) {
@@ -158,7 +206,7 @@
     const status = String(item.status || 'Open').toLowerCase();
     const image = item.has_image
       ? '<img src="' + API + '/items/' + type + '/' + Number(item.item_id) + '/image" alt="' + escapeHtml(item.name) + '" class="item-card-image">'
-      : '<div class="item-card-image-placeholder"><span>No photo</span></div>';
+      : '<div class="item-card-image-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.4"/><path d="m20 16-4.2-4.2L6 20"/></svg><span>No photo</span></div>';
     let action = '<p class="footer-note">This item has been resolved.</p>';
     if (item.status === 'Open') {
       action = '<button type="button" class="btn btn-primary" data-action="claim" data-type="' + type +
@@ -243,7 +291,7 @@
     const ownFound = found.filter(function (item) { return Number(item.reported_by) === Number(currentUser.id); });
     const claims = lost.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); })
       .concat(found.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); }));
-    document.getElementById('topbar-title').textContent = 'My desk';
+    document.getElementById('topbar-title').textContent = 'My Desk';
     document.getElementById('topbar-actions').innerHTML = '';
 
     const reports = ownLost.map(function (item) { return recordRow('lost', item); })
@@ -258,35 +306,42 @@
 
     pageContent.innerHTML =
       '<section class="welcome"><div class="welcome-copy">' +
-      '<p class="eyebrow">Camarines Sur Polytechnic Colleges</p><h1>Hello, <em>' +
-      escapeHtml(currentUser.username) + '</em>.</h1>' +
-      '<p class="lede">Your reports and claims, kept in one place. Search covers lost and found items.</p>' +
+      '<h1>Welcome back, <em>' + escapeHtml(currentUser.username) + '</em></h1>' +
+      '<p class="lede">Looking for something? Search the lost board, or start a report below.</p>' +
       '<form class="search-bar search-bar-lg" id="home-search-form" role="search">' +
-      '<span class="search-bar-icon" aria-hidden="true">⌕</span>' +
+      '<span class="search-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>' +
       '<label class="visually-hidden" for="home-search">Search items</label>' +
-      '<input id="home-search" name="q" type="search" placeholder="Search items…">' +
+      '<input id="home-search" name="q" type="search" placeholder="Search lost items by name, description or place">' +
+      '<kbd class="search-shortcut" aria-hidden="true">/</kbd>' +
       '<button type="submit" class="btn btn-primary">Search</button></form>' +
       '<div class="welcome-counts" aria-label="Your activity">' +
-      '<div><strong>' + ownLost.length + '</strong><span>Lost reports</span></div>' +
-      '<div><strong>' + ownFound.length + '</strong><span>Found reports</span></div>' +
-      '<div><strong>' + claims.length + '</strong><span>Claims</span></div></div></div>' +
+      '<div><span>Lost reports</span><strong>' + ownLost.length + '</strong><small>' +
+      (ownLost.length ? 'On the board' : 'None yet') + '</small></div>' +
+      '<div><span>Found reports</span><strong>' + ownFound.length + '</strong><small>' +
+      (ownFound.length ? 'On the board' : 'None yet') + '</small></div>' +
+      '<div><span>Claims</span><strong>' + claims.length + '</strong><small>' +
+      (claims.length ? 'In progress' : 'None yet') + '</small></div></div></div>' +
       '<figure class="welcome-plate"><img src="/img/cspc_campus.jpg" alt="CSPC Multi-Purpose Building I">' +
-      '<figcaption><span>Campus</span>Multi-Purpose Building I</figcaption></figure></section>' +
+      '<figcaption><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>Multi-Purpose Building I</figcaption></figure></section>' +
       '<section class="capsules" aria-label="Quick actions">' +
       '<button type="button" class="capsule capsule-deep" data-action="report" data-type="lost">' +
-      '<span class="capsule-kicker">Report</span><span class="capsule-title">I lost something</span></button>' +
+      '<span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m20.2 13.2-7.2 7.2a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="16.5" cy="7.5" r="1.2"/></svg></span>' +
+      '<span class="capsule-copy"><span class="capsule-title">Report a lost item</span><span class="capsule-note">Tell us what went missing</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>' +
       '<button type="button" class="capsule capsule-mid" data-action="report" data-type="found">' +
-      '<span class="capsule-kicker">Turn in</span><span class="capsule-title">I found something</span></button>' +
-      '<a class="capsule capsule-ice" href="#" data-page="lost"><span class="capsule-kicker">Browse</span>' +
-      '<span class="capsule-title">Open the board</span></a></section>' +
+      '<span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m20.2 13.2-7.2 7.2a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><path d="M12 7.7c1.4 0 2.4 1 2.4 2.2 0 2-2.4 4.3-2.4 4.3s-2.4-2.3-2.4-4.3c0-1.2 1-2.2 2.4-2.2Z"/></svg></span>' +
+      '<span class="capsule-copy"><span class="capsule-title">Turn in a found item</span><span class="capsule-note">Help it reach its owner</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>' +
+      '<a class="capsule capsule-ice" href="#" data-page="lost"><span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>' +
+      '<span class="capsule-copy"><span class="capsule-title">Browse the board</span><span class="capsule-note">See everything reported</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></section>' +
       '<div class="split"><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Items you reported</h2>' +
-      '<p class="panel-note">Lost and found reports attached to your account.</p></div></div>' +
-      (reports || '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
+      '<p class="panel-note">Lost and found reports attached to your account.</p></div><div class="panel-actions">' +
+      '<a class="btn btn-secondary btn-sm" href="#" data-page="lost">Lost board</a>' +
+      '<a class="btn btn-secondary btn-sm" href="#" data-page="found">Found board</a></div></div>' +
+      (reports || '<div class="empty-state"><svg class="empty-art" viewBox="0 0 100 72" fill="none" aria-hidden="true"><path d="M22 11h42l20 20-20 20H22a7 7 0 0 1-7-7V18a7 7 0 0 1 7-7Z" stroke="currentColor" stroke-width="1.7" stroke-dasharray="4 4"/><circle cx="27" cy="25" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M39 25h23M39 33h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="78" cy="54" r="12" fill="var(--panel)" stroke="currentColor" stroke-width="1.7"/></svg>' +
         '<h3 class="empty-state-title">Nothing reported yet</h3>' +
         '<p class="empty-state-text">When you report a lost or found item, it will show up here.</p></div>') +
       '</section><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Your claims</h2>' +
       '<p class="panel-note">Management verifies each claim before an item is returned.</p></div></div>' +
-      (claimRows || '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
+      (claimRows || '<div class="empty-state"><svg class="empty-art empty-art-claim" viewBox="0 0 100 72" fill="none" aria-hidden="true"><path d="M17 16h66v40H17z" stroke="currentColor" stroke-width="1.7" stroke-dasharray="4 4"/><path d="M30 16v40m40-40v40" stroke="currentColor" stroke-width="1.7" stroke-dasharray="3 4"/><circle cx="50" cy="36" r="12" fill="var(--panel)" stroke="currentColor" stroke-width="1.7"/><path d="m45 36 3.5 3.5L55 33" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '<h3 class="empty-state-title">No claims yet</h3>' +
         '<p class="empty-state-text">If you recognize a belonging, claim it and track it here.</p></div>') +
       '</section></div>';
@@ -354,6 +409,7 @@
       '<header class="page-intro page-intro-solo"><div><p class="eyebrow">Campus search</p>' +
       '<h1>Search lost and found items.</h1><p class="lede">Look up a name, a detail from the description, or a location.</p></div></header>' +
       '<form class="search-bar search-bar-lg" id="search-form" role="search">' +
+      '<span class="search-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>' +
       '<label class="visually-hidden" for="search-query">Search items</label>' +
       '<input id="search-query" name="q" type="search" value="' + safeQuery + '" placeholder="Search items…">' +
       '<button type="submit" class="btn btn-primary">Search</button></form>' + resultsMarkup;
@@ -461,6 +517,12 @@
   });
 
   document.addEventListener('click', async function (event) {
+    const themeChoice = event.target.closest('[data-theme-choice]');
+    if (themeChoice) {
+      setTheme(themeChoice.dataset.themeChoice);
+      return;
+    }
+
     const pageLink = event.target.closest('[data-page]');
     if (pageLink) {
       event.preventDefault();
@@ -504,7 +566,11 @@
       return;
     }
     if (action.dataset.action === 'claim') {
-      if (!window.confirm('Claim this item? Management will verify the claim.')) return;
+      const confirmed = await requestConfirmation(
+        'Claim this item?',
+        'Management will verify your claim before the item is returned.'
+      );
+      if (!confirmed) return;
       try {
         await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/claim', { method: 'POST' });
         showAlert('Claim submitted. Management will verify the item.', 'success');
@@ -515,7 +581,11 @@
       return;
     }
     if (action.dataset.action === 'resolve') {
-      if (!window.confirm('Mark this item as returned and resolved?')) return;
+      const confirmed = await requestConfirmation(
+        'Resolve this item?',
+        'Mark this item as resolved after it has been returned to the claimant.'
+      );
+      if (!confirmed) return;
       try {
         await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/resolve', { method: 'POST' });
         showAlert('Item marked as resolved.', 'success');
@@ -530,8 +600,11 @@
     const file = event.target.files && event.target.files[0];
     const preview = document.getElementById('report-preview');
     const errorBox = document.getElementById('report-error');
+    const uploadText = document.getElementById('upload-area-text');
     if (!file) {
       preview.hidden = true;
+      preview.classList.remove('is-visible');
+      uploadText.textContent = 'Drop a photo or click to browse';
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -539,6 +612,8 @@
       errorBox.textContent = 'Image must be 5 MB or smaller.';
       errorBox.hidden = false;
       preview.hidden = true;
+      preview.classList.remove('is-visible');
+      uploadText.textContent = 'Drop a photo or click to browse';
       return;
     }
     if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
@@ -546,11 +621,44 @@
       errorBox.textContent = 'Only JPEG, PNG, GIF or WebP images are allowed.';
       errorBox.hidden = false;
       preview.hidden = true;
+      preview.classList.remove('is-visible');
+      uploadText.textContent = 'Drop a photo or click to browse';
       return;
     }
     errorBox.hidden = true;
     preview.src = URL.createObjectURL(file);
     preview.hidden = false;
+    preview.classList.add('is-visible');
+    uploadText.textContent = file.name;
+  });
+
+  const uploadArea = document.getElementById('upload-area');
+  uploadArea.addEventListener('dragover', function (event) {
+    event.preventDefault();
+    uploadArea.classList.add('is-dragging');
+  });
+  uploadArea.addEventListener('dragleave', function (event) {
+    if (!uploadArea.contains(event.relatedTarget)) uploadArea.classList.remove('is-dragging');
+  });
+  uploadArea.addEventListener('drop', function (event) {
+    event.preventDefault();
+    uploadArea.classList.remove('is-dragging');
+    if (!event.dataTransfer.files.length) return;
+    const transfer = new DataTransfer();
+    Array.from(event.dataTransfer.files).forEach(function (file) { transfer.items.add(file); });
+    const imageInput = document.getElementById('report-image');
+    imageInput.files = transfer.files;
+    imageInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  document.getElementById('confirmCancel').addEventListener('click', function () {
+    finishConfirmation(false);
+  });
+  document.getElementById('confirmProceed').addEventListener('click', function () {
+    finishConfirmation(true);
+  });
+  confirmDialog.addEventListener('click', function (event) {
+    if (event.target === confirmDialog) finishConfirmation(false);
   });
 
   mobileToggle.addEventListener('click', function () {
@@ -565,7 +673,15 @@
     if (event.target === reportModal) closeReport();
   });
   document.addEventListener('keydown', function (event) {
+    if (event.key === '/' && currentUser &&
+        !event.target.matches('input, textarea, select, [contenteditable="true"]')) {
+      event.preventDefault();
+      const searchInput = document.getElementById('home-search') ||
+        document.getElementById('search-query');
+      if (searchInput) searchInput.focus();
+    }
     if (event.key === 'Escape') {
+      if (confirmDialog.classList.contains('is-open')) finishConfirmation(false);
       closeReport();
       closeSidebar();
     }

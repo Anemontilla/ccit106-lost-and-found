@@ -84,17 +84,32 @@
           <span class="brand-mark"><img src="/img/cspc_logo.png" alt=""></span>
           <span class="brand-text">
             <span class="brand-name">Lost &amp; Found</span>
-            <span class="brand-sub">CSPC · Nabua</span>
+            <span class="brand-sub">Camarines Sur Polytechnic Colleges</span>
           </span>
         </a>
         <nav class="sidebar-nav" id="sidebar-nav" aria-label="Main navigation">
           <div class="sidebar-section-label" id="nav-section-primary">Campus</div>
-          <a class="sidebar-link" href="#" data-page="home">My desk</a>
+            <a class="sidebar-link" href="#" data-page="home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg>
+              <span>My desk</span>
+            </a>
           <div class="sidebar-section-label">Discover</div>
-          <a class="sidebar-link" href="#" data-page="lost">Lost items</a>
-          <a class="sidebar-link" href="#" data-page="found">Found items</a>
-          <a class="sidebar-link" href="#" data-page="search">Search</a>
-          <a class="sidebar-link" href="#" data-page="management" id="management-link" hidden>Management overview</a>
+            <a class="sidebar-link" href="#" data-page="lost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 13.2 13 20.4a2 2 0 0 1-2.8 0L3.6 13.8a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="16.5" cy="7.5" r="1.2"/></svg>
+              <span>Lost items</span>
+            </a>
+            <a class="sidebar-link" href="#" data-page="found">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 13.2 13 20.4a2 2 0 0 1-2.8 0L3.6 13.8a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><path d="M12 7.7c1.4 0 2.4 1 2.4 2.2 0 2-2.4 4.3-2.4 4.3s-2.4-2.3-2.4-4.3c0-1.2 1-2.2 2.4-2.2Z"/></svg>
+              <span>Found items</span>
+            </a>
+            <a class="sidebar-link" href="#" data-page="search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>
+              <span>Search</span>
+            </a>
+            <a class="sidebar-link" href="#" data-page="management" id="management-link" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/></svg>
+              <span>Management overview</span>
+            </a>
         </nav>
         <div class="sidebar-footer">
           <div class="sidebar-user">
@@ -104,7 +119,10 @@
               <div class="sidebar-user-role" id="sidebar-role"></div>
             </div>
           </div>
-          <button type="button" class="btn-logout" data-action="logout">Sign out</button>
+          <button type="button" class="btn-logout" data-action="logout">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            <span>Sign out</span>
+          </button>
         </div>
       </aside>
 
@@ -115,6 +133,14 @@
           </button>
           <p class="topbar-title" id="topbar-title">My desk</p>
           <div class="topbar-actions" id="topbar-actions"></div>
+          <div class="theme-toggle" role="group" aria-label="Color theme">
+            <button type="button" data-theme-choice="light" aria-label="Use light theme" aria-pressed="false" title="Light theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+            </button>
+            <button type="button" data-theme-choice="dark" aria-label="Use dark theme" aria-pressed="true" title="Dark theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.4 15.1A8.5 8.5 0 0 1 8.9 3.6 8.7 8.7 0 1 0 20.4 15.1Z"/></svg>
+            </button>
+          </div>
         </header>
         <main class="page-content" id="main">
           <div class="alerts-wrapper" id="alerts-wrapper" role="status" aria-live="polite"></div>
@@ -135,7 +161,9 @@
           <p class="eyebrow">New report</p>
           <h2 class="modal-title" id="report-title">Report an item</h2>
         </div>
-        <button type="button" class="modal-close" data-action="close-report" aria-label="Close">×</button>
+        <button type="button" class="modal-close" data-action="close-report" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
       </div>
       <form id="report-form" enctype="multipart/form-data">
         <input type="hidden" name="type" id="report-type">
@@ -161,8 +189,13 @@
           </div>
           <div class="form-group">
             <label class="form-label" for="report-image">Photo <span class="form-label-hint">optional, 5 MB max</span></label>
-            <input id="report-image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
-            <img id="report-preview" class="upload-preview" alt="" hidden>
+            <div class="upload-area" id="upload-area">
+              <input id="report-image" name="image" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+              <svg class="upload-area-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.4"/><path d="m20 16-4.2-4.2L6 20"/></svg>
+              <div class="upload-area-text" id="upload-area-text">Drop a photo or click to browse</div>
+              <div class="upload-area-hint">JPEG, PNG, WebP, or GIF</div>
+              <img id="report-preview" class="upload-preview" alt="" hidden>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -170,6 +203,18 @@
           <button type="submit" class="btn btn-primary">Submit report</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="confirm-dialog" id="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage" hidden>
+    <div class="confirm-box">
+      <p class="eyebrow">Please confirm</p>
+      <h2 class="confirm-box-title" id="confirmTitle">Are you sure?</h2>
+      <p class="confirm-box-text" id="confirmMessage">This action cannot be undone.</p>
+      <div class="confirm-box-actions">
+        <button class="btn btn-secondary" id="confirmCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="confirmProceed" type="button">Confirm</button>
+      </div>
     </div>
   </div>
 </body>
