@@ -163,6 +163,17 @@
       (currentUser.role === 'Management' || currentUser.is_staff));
   }
 
+  function updateTopbarAction(page) {
+    const button = document.getElementById('topbar-report-button');
+    const type = page === 'lost' || page === 'found' ? page : null;
+    button.hidden = !type;
+    if (!type) return;
+    const label = type === 'lost' ? 'Report a lost item' : 'Turn in a found item';
+    button.dataset.openReport = type;
+    button.setAttribute('aria-label', label);
+    button.querySelector('span').textContent = label;
+  }
+
   function showApp(user) {
     currentUser = user;
     authView.hidden = true;
@@ -631,6 +642,7 @@
       page = 'home';
       showToast('Management access is required for that page.', 'error');
     }
+    updateTopbarAction(page);
     currentPage = page;
     document.querySelectorAll('.nav__link[data-page]').forEach(function (link) {
       link.classList.toggle('is-active', link.dataset.page === page);
