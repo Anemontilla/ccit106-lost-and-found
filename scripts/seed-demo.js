@@ -38,11 +38,14 @@ async function main() {
         }
 
         const hash = await bcrypt.hash(password, 10);
+        const isActive = role === 'Management' ? 0 : 1;
         await connection.query(
-            'INSERT INTO users (username, password, id_number, role) VALUES (?, ?, ?, ?)',
-            [username, hash, idNumber, role]
+            'INSERT INTO users (username, password, id_number, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            [username, hash, idNumber, role, isActive]
         );
-        console.log(`Created the ${role} demo account for ${username}.`);
+        console.log(role === 'Management'
+            ? `Created a pending Management request for ${username}; approve it before sign-in.`
+            : `Created the ${role} demo account for ${username}.`);
     } finally {
         await connection.end();
     }

@@ -103,6 +103,14 @@
               <input id="signup-id" name="id_number" type="text" maxlength="20" autocomplete="off" required>
             </div>
             <div class="field field--tight">
+              <label class="field__label" for="signup-role">Account role</label>
+              <select id="signup-role" name="role" required>
+                <option value="Normal_User">Normal user</option>
+                <option value="Management">Management (requires administrator approval)</option>
+              </select>
+              <p class="field__help">Management access stays locked until an administrator approves the request.</p>
+            </div>
+            <div class="field field--tight">
               <label class="field__label" for="signup-password">Password <span class="field__hint">At least 8 characters</span></label>
               <input id="signup-password" name="password" type="password" minlength="8" autocomplete="new-password" required>
             </div>

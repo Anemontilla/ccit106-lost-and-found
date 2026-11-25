@@ -163,6 +163,10 @@
       (currentUser.role === 'Management' || currentUser.is_staff));
   }
 
+  function isAdmin() {
+    return Boolean(currentUser && currentUser.is_staff);
+  }
+
   function updateTopbarAction(page) {
     const button = document.getElementById('topbar-report-button');
     const type = page === 'lost' || page === 'found' ? page : null;
@@ -543,8 +547,41 @@
       icon('chevron', 'record__go') + '</a>';
   }
 
+  function managementRequestRow(request) {
+    const username = String(request.username || '');
+    return '<div class="record record--static record--approval">' +
+      '<span class="record__thumb record__thumb--claim">' + icon('clock') + '</span>' +
+      '<span class="record__main"><span class="record__title">' + escapeHtml(username) +
+      '</span><span class="record__meta">ID number: ' + escapeHtml(request.id_number) +
+      '</span></span><span class="status status--claimed">Pending</span>' +
+      '<button class="btn btn--success btn--sm" type="button" data-action="approve-management" ' +
+      'data-id="' + Number(request.id) + '" data-username="' + escapeHtml(username) + '">Approve</button></div>';
+  }
+
+  function managementRequestsPanel(requests) {
+    if (!isAdmin()) return '';
+    const rows = requests.map(managementRequestRow).join('');
+    return '<section class="panel management-requests" aria-labelledby="management-requests-heading">' +
+      '<header class="panel__head"><div><h2 class="panel__title" id="management-requests-heading">Management access requests</h2>' +
+      '<p class="panel__note">Approve a request to activate the account and grant management access.</p></div>' +
+      (requests.length ? '<span class="status status--claimed">' + requests.length + ' pending</span>' : '') +
+      '</header>' + (rows
+        ? '<div class="records">' + rows + '</div>'
+        : '<div class="empty">' + emptyArt('clear') + '<h3 class="empty__title">No requests waiting</h3>' +
+          '<p class="empty__text">New management requests will appear here for review.</p></div>') +
+      '</section>';
+  }
+
   async function renderManagement() {
-    const [lost, found] = await Promise.all([loadItems('lost'), loadItems('found')]);
+    const requestsPromise = isAdmin()
+      ? api('/auth/management-requests')
+      : Promise.resolve({ requests: [] });
+    const [lost, found, requestData] = await Promise.all([
+      loadItems('lost'),
+      loadItems('found'),
+      requestsPromise,
+    ]);
+    const accessRequests = managementRequestsPanel(requestData.requests);
     const entries = lost.map(function (item) { return { type: 'lost', item: item }; })
       .concat(found.map(function (item) { return { type: 'found', item: item }; }))
       .sort(function (a, b) { return new Date(b.item.created_at) - new Date(a.item.created_at); });
@@ -572,7 +609,7 @@
     }).join('');
     const recent = entries.slice(0, 10).map(managerRecord).join('');
     pageContent.innerHTML =
-      '<header class="page-head page-head--ops"><div class="page-head__copy">' +
+      accessRequests + '<header class="page-head page-head--ops"><div class="page-head__copy">' +
       (pending.length
         ? '<h1 class="page-head__title">' + pending.length + ' claim' + (pending.length === 1 ? '' : 's') + ' waiting for verification</h1>' +
           '<p class="page-head__lede">Verify the claimant, hand the item over, then mark the record resolved.</p>'
@@ -696,19 +733,23 @@
     setBusy(button, true);
     try {
       const fields = new FormData(form);
-      await api('/auth/signup', {
+      const data = await api('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
           username: fields.get('username'),
           id_number: fields.get('id_number'),
           password: fields.get('password'),
+          role: fields.get('role'),
         }),
       });
       const idNumber = fields.get('id_number');
+      const approvalRequired = data.approval_required;
       form.reset();
       showAuth('login');
       document.getElementById('login-identifier').value = idNumber;
-      showToast('Account created. You can now sign in with your ID number.');
+      showToast(approvalRequired
+        ? 'Management request submitted. An administrator must approve it before you can sign in.'
+        : 'Account created. You can now sign in with your ID number.');
     } catch (error) {
       setBanner('auth-error', error.message);
     } finally {
@@ -746,6 +787,28 @@
   async function handleAction(action) {
     if (action.dataset.action === 'report') {
       openReport(action.dataset.type);
+      return;
+    }
+    if (action.dataset.action === 'approve-management') {
+      const requestId = Number(action.dataset.id);
+      if (!Number.isSafeInteger(requestId) || requestId < 1) {
+        showToast('Invalid management request.', 'error');
+        return;
+      }
+      const username = action.dataset.username || 'this user';
+      const confirmed = await requestConfirmation(
+        'Approve management access?',
+        'Allow ' + username + ' to sign in with management privileges?',
+        'Approve access'
+      );
+      if (!confirmed) return;
+      try {
+        await api('/auth/management-requests/' + requestId + '/approve', { method: 'POST' });
+        showToast('Management access approved.');
+        await renderPage(currentPage);
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
       return;
     }
     if (action.dataset.action === 'logout') {

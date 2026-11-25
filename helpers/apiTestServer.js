@@ -13,7 +13,7 @@ function createTestApp(router, db, prefix) {
                 id: Number(req.get('x-test-user-id') || 7),
                 username: 'test-user',
                 role,
-                is_staff: role === 'Management',
+                is_staff: req.get('x-test-staff') === '1',
             };
         }
         next();
