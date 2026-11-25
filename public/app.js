@@ -2,31 +2,23 @@
   'use strict';
 
   const API = '/api';
+  const THEME_KEY = 'cspc-theme';
   const authView = document.getElementById('auth-view');
   const appView = document.getElementById('app-view');
   const pageContent = document.getElementById('page-content');
-  const sidebar = document.getElementById('appSidebar');
-  const sidebarOverlay = document.getElementById('sidebarOverlay');
-  const mobileToggle = document.getElementById('mobileMenuToggle');
-  const reportModal = document.getElementById('report-modal');
-  const confirmDialog = document.getElementById('confirmDialog');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+  const menuButton = document.getElementById('menu-button');
+  const reportDialog = document.getElementById('report-dialog');
+  const confirmDialog = document.getElementById('confirm-dialog');
+  const reduceMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
   let currentUser = null;
   let currentPage = 'home';
-  let currentFilter = 'all';
   let confirmationResolver = null;
-
-  function setTheme(theme) {
-    const activeTheme = theme === 'light' ? 'light' : 'dark';
-    document.body.dataset.theme = activeTheme;
-    document.querySelectorAll('[data-theme-choice]').forEach(function (button) {
-      const active = button.dataset.themeChoice === activeTheme;
-      button.setAttribute('aria-pressed', String(active));
-      button.classList.toggle('is-selected', active);
-    });
-    window.localStorage.setItem('lost-found-theme', activeTheme);
-  }
-
-  setTheme(window.localStorage.getItem('lost-found-theme') || 'dark');
+  let restoreFocus = null;
+  let previewUrl = null;
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
@@ -40,48 +32,111 @@
     });
   }
 
+  function icon(name, className) {
+    return '<svg class="i' + (className ? ' ' + className : '') + '" aria-hidden="true"><use href="#i-' +
+      escapeHtml(name) + '"></use></svg>';
+  }
+
+  function setTheme(theme, persist) {
+    const activeTheme = theme === 'light' ? 'light' : 'dark';
+    const paint = function () {
+      document.documentElement.setAttribute('data-theme', activeTheme);
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', activeTheme === 'light' ? '#e8eefb' : '#030d2e');
+      document.querySelectorAll('[data-theme-toggle]').forEach(function (button) {
+        button.setAttribute('aria-checked', String(activeTheme === 'dark'));
+        button.setAttribute('aria-label', activeTheme === 'dark' ? 'Dark theme' : 'Light theme');
+        button.setAttribute('title', activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+      });
+    };
+    if (document.startViewTransition && !reduceMotion) {
+      document.startViewTransition(paint);
+    } else if (!reduceMotion) {
+      document.documentElement.classList.add('theme-anim');
+      paint();
+      window.setTimeout(function () {
+        document.documentElement.classList.remove('theme-anim');
+      }, 380);
+    } else {
+      paint();
+    }
+    if (persist) {
+      try {
+        window.localStorage.setItem(THEME_KEY, activeTheme);
+      } catch (error) {
+        // The current page still uses the selected theme if storage is unavailable.
+      }
+    }
+  }
+
+  function getSavedTheme() {
+    try {
+      const current = window.localStorage.getItem(THEME_KEY);
+      if (current === 'light' || current === 'dark') return current;
+      const legacy = window.localStorage.getItem('lost-found-theme');
+      return legacy === 'light' || legacy === 'dark' ? legacy : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function showToast(message, type) {
+    const toast = document.createElement('div');
+    const kind = type === 'error' ? 'error' : 'success';
+    toast.className = 'toast toast--' + kind;
+    toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    toast.innerHTML = icon(kind === 'error' ? 'alert' : 'check', 'toast__icon') +
+      '<span class="toast__text"></span><button class="toast__close" type="button" aria-label="Dismiss notification">' +
+      icon('x') + '</button>';
+    toast.querySelector('.toast__text').textContent = message;
+    const dismiss = function () {
+      if (!toast.isConnected || toast.classList.contains('is-leaving')) return;
+      toast.classList.add('is-leaving');
+      window.setTimeout(function () { toast.remove(); }, 300);
+    };
+    let timer = window.setTimeout(dismiss, 5000);
+    toast.addEventListener('mouseenter', function () { window.clearTimeout(timer); });
+    toast.addEventListener('mouseleave', function () {
+      timer = window.setTimeout(dismiss, 2400);
+    });
+    toast.querySelector('.toast__close').addEventListener('click', dismiss);
+    document.getElementById('toasts').appendChild(toast);
+  }
+
+  function setBanner(id, message) {
+    const banner = document.getElementById(id);
+    if (!banner) return;
+    banner.querySelector('span').textContent = message;
+    banner.hidden = !message;
+  }
+
+  function setBusy(button, busy) {
+    button.disabled = busy;
+    button.classList.toggle('is-busy', busy);
+    if (busy) button.setAttribute('aria-busy', 'true');
+    else button.removeAttribute('aria-busy');
+  }
+
   async function api(path, options) {
     const opts = options || {};
     const headers = { ...opts.headers };
     if (opts.body && !(opts.body instanceof FormData) && !headers['Content-Type']) {
       headers['Content-Type'] = 'application/json';
     }
-
     const response = await fetch(API + path, {
       credentials: 'include',
       ...opts,
       headers,
     });
     const contentType = response.headers.get('content-type') || '';
-    const data = contentType.includes('application/json')
-      ? await response.json()
-      : null;
-
-    if (response.status === 401 && path !== '/auth/login') {
-      showAuth('login');
-    }
+    const data = contentType.includes('application/json') ? await response.json() : null;
+    if (response.status === 401 && path !== '/auth/login') showAuth('login');
     if (!response.ok) {
-      throw new Error(data && data.error ? data.error : 'Request failed. Please try again.');
+      const error = new Error(data && data.error ? data.error : 'Request failed. Please try again.');
+      error.status = response.status;
+      throw error;
     }
     return data;
-  }
-
-  function showAlert(message, type) {
-    const wrapper = currentUser
-      ? document.getElementById('alerts-wrapper')
-      : document.getElementById('auth-notice');
-    const alert = document.createElement('div');
-    alert.className = 'alert ' + (type === 'error' ? 'alert-error' : 'alert-success');
-    alert.setAttribute('role', type === 'error' ? 'alert' : 'status');
-    alert.innerHTML = (type === 'error'
-      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>') +
-      '<span></span>';
-    alert.querySelector('span').textContent = message;
-    wrapper.replaceChildren(alert);
-    window.setTimeout(function () {
-      if (alert.isConnected) alert.remove();
-    }, 5200);
   }
 
   function showAuth(panel) {
@@ -89,9 +144,23 @@
     appView.hidden = true;
     authView.hidden = false;
     document.body.classList.add('auth-body');
+    document.getElementById('skip-link').href = '#auth-view';
     document.getElementById('login-panel').hidden = panel !== 'login';
     document.getElementById('signup-panel').hidden = panel !== 'signup';
+    const signingUp = panel === 'signup';
+    document.getElementById('auth-headline').innerHTML = signingUp
+      ? 'A desk for<br>the whole campus.'
+      : 'Lost on campus.<br>Found again.';
+    document.getElementById('auth-lede').textContent = signingUp
+      ? 'Register once with your ID number. After that, reporting, browsing and claiming stay in one place.'
+      : 'Report a missing belonging, turn in something you found, and follow a claim until it is back with its owner.';
+    setBanner('auth-error', '');
     closeSidebar();
+  }
+
+  function isManagement() {
+    return Boolean(currentUser &&
+      (currentUser.role === 'Management' || currentUser.is_staff));
   }
 
   function showApp(user) {
@@ -99,60 +168,104 @@
     authView.hidden = true;
     appView.hidden = false;
     document.body.classList.remove('auth-body');
-    document.getElementById('user-avatar').textContent = user.username.slice(0, 1).toUpperCase();
-    document.getElementById('sidebar-username').textContent = user.username;
-    document.getElementById('sidebar-role').textContent =
-      user.role === 'Management' || user.is_staff ? 'Management' : 'Student';
-    document.getElementById('management-link').hidden =
-      user.role !== 'Management' && !user.is_staff;
-    document.getElementById('nav-section-primary').textContent =
-      user.role === 'Management' || user.is_staff ? 'Management' : 'Campus';
-    document.getElementById('auth-notice').replaceChildren();
+    document.getElementById('skip-link').href = '#page-content';
+    const username = user.username || 'CSPC member';
+    document.getElementById('user-avatar').textContent = username.slice(0, 1).toUpperCase();
+    document.getElementById('sidebar-username').textContent = username;
+    document.getElementById('sidebar-role').textContent = isManagement() ? 'Management' : 'CSPC member';
+    document.getElementById('management-nav').hidden = !isManagement();
     currentPage = 'home';
     renderPage(currentPage);
   }
 
-  function closeSidebar() {
-    if (!sidebar) return;
+  function syncScrollLock() {
+    const isOpen = Boolean(document.querySelector('.dialog.is-open, .sidebar.is-open'));
+    document.body.classList.toggle('nav-lock', isOpen);
+  }
+
+  function openSidebar() {
+    sidebar.classList.add('is-open');
+    sidebarOverlay.classList.add('is-open');
+    menuButton.setAttribute('aria-expanded', 'true');
+    syncScrollLock();
+    const first = sidebar.querySelector('a, button');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function closeSidebar(restoreFocus) {
+    if (!sidebar || !sidebar.classList.contains('is-open')) return;
     sidebar.classList.remove('is-open');
-    sidebarOverlay.hidden = true;
     sidebarOverlay.classList.remove('is-open');
-    document.body.classList.remove('nav-lock');
-    mobileToggle.setAttribute('aria-expanded', 'false');
+    menuButton.setAttribute('aria-expanded', 'false');
+    syncScrollLock();
+    if (restoreFocus && menuButton) menuButton.focus({ preventScroll: true });
+  }
+
+  function openDialog(dialog, focusTarget) {
+    restoreFocus = document.activeElement;
+    dialog.classList.add('is-open');
+    dialog.setAttribute('aria-hidden', 'false');
+    syncScrollLock();
+    if (focusTarget) focusTarget.focus();
+  }
+
+  function closeDialog(dialog) {
+    dialog.classList.remove('is-open');
+    dialog.setAttribute('aria-hidden', 'true');
+    syncScrollLock();
+    if (restoreFocus && typeof restoreFocus.focus === 'function') restoreFocus.focus();
+    restoreFocus = null;
+  }
+
+  function resetPreview() {
+    const preview = document.getElementById('upload-preview');
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+    preview.removeAttribute('src');
+    preview.classList.remove('is-visible');
+    document.getElementById('upload-area-text').textContent = 'Drop a photo or click to browse';
   }
 
   function openReport(type) {
     const form = document.getElementById('report-form');
     form.reset();
+    resetPreview();
     document.getElementById('report-type').value = type;
-    document.getElementById('upload-area-text').textContent = 'Drop a photo or click to browse';
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    const today = now.toISOString().slice(0, 10);
+    document.getElementById('report-date').value = today;
+    document.getElementById('report-date').max = today;
     document.getElementById('report-title').textContent =
-      type === 'lost' ? 'Report a lost item' : 'Report a found item';
-    document.getElementById('report-error').hidden = true;
-    document.getElementById('report-preview').hidden = true;
-    reportModal.hidden = false;
-    reportModal.classList.add('is-open');
-    document.body.classList.add('nav-lock');
-    document.getElementById('report-name').focus();
+      type === 'lost' ? 'Report a lost item' : 'Turn in a found item';
+    document.getElementById('report-subtitle').textContent =
+      type === 'lost' ? 'Add details to help your belongings find their way home.' :
+        'Add details so the owner can recognize and reclaim the item.';
+    setBanner('report-error', '');
+    openDialog(reportDialog, document.getElementById('report-name'));
   }
 
   function closeReport() {
-    reportModal.classList.remove('is-open');
-    reportModal.hidden = true;
-    document.body.classList.remove('nav-lock');
-    const preview = document.getElementById('report-preview');
-    preview.removeAttribute('src');
-    preview.hidden = true;
-    preview.classList.remove('is-visible');
-    document.getElementById('upload-area-text').textContent = 'Drop a photo or click to browse';
+    if (!reportDialog.classList.contains('is-open')) return;
+    closeDialog(reportDialog);
+    document.getElementById('report-form').reset();
+    resetPreview();
+  }
+
+  function requestConfirmation(title, message, buttonText) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.querySelector('[data-confirm-accept]').textContent = buttonText || 'Continue';
+    openDialog(confirmDialog, document.querySelector('[data-confirm-accept]'));
+    return new Promise(function (resolve) {
+      confirmationResolver = resolve;
+    });
   }
 
   function finishConfirmation(confirmed) {
-    confirmDialog.classList.remove('is-open');
-    confirmDialog.hidden = true;
-    if (!document.querySelector('.modal-overlay.is-open, .sidebar.is-open')) {
-      document.body.classList.remove('nav-lock');
-    }
+    closeDialog(confirmDialog);
     if (confirmationResolver) {
       const resolve = confirmationResolver;
       confirmationResolver = null;
@@ -160,80 +273,102 @@
     }
   }
 
-  function requestConfirmation(title, message) {
-    document.getElementById('confirmTitle').textContent = title;
-    document.getElementById('confirmMessage').textContent = message;
-    confirmDialog.hidden = false;
-    confirmDialog.classList.add('is-open');
-    document.body.classList.add('nav-lock');
-    document.getElementById('confirmProceed').focus();
-    return new Promise(function (resolve) {
-      confirmationResolver = resolve;
-    });
+  function statusClass(status) {
+    const normalized = String(status || '').toLowerCase();
+    return ['open', 'claimed', 'resolved'].includes(normalized) ? normalized : 'unknown';
   }
 
-  function pageError(error) {
-    pageContent.innerHTML =
-      '<section class="panel"><div class="empty-state">' +
-      '<h2 class="empty-state-title">Could not load this page</h2>' +
-      '<p class="empty-state-text">' + escapeHtml(error.message) + '</p>' +
-      '</div></section>';
+  function formatDate(value) {
+    if (!value) return '';
+    const raw = String(value);
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw + 'T00:00:00' : raw);
+    if (Number.isNaN(date.getTime())) return escapeHtml(raw);
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
   }
 
-  function pageIntro(kicker, title, description, type) {
-    return '<header class="page-intro">' +
-      '<div><p class="eyebrow">' + kicker + '</p><h1>' + title + '</h1>' +
-      '<p class="lede">' + description + '</p></div>' +
-      (type ? '<button type="button" class="btn btn-primary btn-sm" data-action="report" data-type="' + type + '">' +
-        'Report ' + type + ' item</button>' : '') +
-      '</header>';
+  function formatSince(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return minutes + 'm ago';
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    return days < 7 ? days + 'd ago' : formatDate(value);
   }
 
-  function displayDate(value) {
-    return escapeHtml(value).split('T')[0];
+  function emptyArt(kind) {
+    const art = '<svg class="art" viewBox="0 0 160 120" aria-hidden="true" focusable="false">' +
+      '<ellipse class="art-glow" cx="80" cy="66" rx="62" ry="40"/>';
+    if (kind === 'ticket') {
+      return art + '<path class="art-line art-dash" d="M34 34H126V52A8 8 0 0 0 126 68V86H34V68A8 8 0 0 0 34 52Z"/>' +
+        '<circle class="art-fill" cx="62" cy="60" r="13"/><circle class="art-line art-accent" cx="62" cy="60" r="13"/>' +
+        '<path class="art-line art-accent" d="m56.5 60.5 4.2 4.2 7-8.2"/></svg>';
+    }
+    if (kind === 'clear') {
+      return art + '<circle class="art-line art-dash" cx="80" cy="62" r="30"/><circle class="art-fill" cx="80" cy="62" r="20"/>' +
+        '<circle class="art-line art-accent" cx="80" cy="62" r="20"/><path class="art-line art-accent" d="m71.5 62.5 6.5 6.5 11-13"/></svg>';
+    }
+    if (kind === 'tag') {
+      return art + '<path class="art-line art-dash" d="M42 36q0-8 8-8h40l28 30-28 30H50q-8 0-8-8z"/>' +
+        '<circle class="art-line" cx="56" cy="58" r="4.5"/><path class="art-line art-soft" d="M70 52h26M70 64h17"/>' +
+        '<circle class="art-fill" cx="112" cy="86" r="15"/><circle class="art-line art-accent" cx="112" cy="86" r="15"/>' +
+        '<path class="art-line art-accent" d="m123.5 97.5 11 11"/></svg>';
+    }
+    return art + '<rect class="art-line" x="34" y="26" width="92" height="70" rx="8"/>' +
+      '<rect class="art-fill" x="44" y="38" width="24" height="28" rx="3"/>' +
+      '<rect class="art-line art-soft" x="44" y="38" width="24" height="28" rx="3"/>' +
+      '<rect class="art-line art-dash" x="76" y="38" width="24" height="28" rx="3"/>' +
+      '<rect class="art-line art-dash" x="44" y="72" width="24" height="16" rx="3"/>' +
+      '<rect class="art-line art-dash" x="76" y="72" width="24" height="16" rx="3"/></svg>';
   }
 
-  function emptyState(title, message, action) {
-    return '<section class="panel"><div class="empty-state">' +
-      '<div class="empty-orb" aria-hidden="true"></div>' +
-      '<h2 class="empty-state-title">' + title + '</h2>' +
-      '<p class="empty-state-text">' + message + '</p>' +
-      (action || '') +
-      '</div></section>';
+  function emptyState(title, message, action, kind) {
+    return '<section class="panel"><div class="empty empty--page">' + emptyArt(kind || 'board') +
+      '<h2 class="empty__title">' + title + '</h2><p class="empty__text">' + message + '</p>' +
+      (action ? '<div class="empty__actions">' + action + '</div>' : '') + '</div></section>';
+  }
+
+  function isImageAvailable(item) {
+    return item.has_image === true || item.has_image === 1 || item.has_image === '1';
   }
 
   function itemCard(type, item) {
-    const status = String(item.status || 'Open').toLowerCase();
-    const image = item.has_image
-      ? '<img src="' + API + '/items/' + type + '/' + Number(item.item_id) + '/image" alt="' + escapeHtml(item.name) + '" class="item-card-image">'
-      : '<div class="item-card-image-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.4"/><path d="m20 16-4.2-4.2L6 20"/></svg><span>No photo</span></div>';
-    let action = '<p class="footer-note">This item has been resolved.</p>';
+    const status = statusClass(item.status);
+    const itemId = Number(item.item_id);
+    const image = isImageAvailable(item)
+      ? '<img src="' + API + '/items/' + type + '/' + itemId + '/image" alt="Photo of ' +
+        escapeHtml(item.name) + '" loading="lazy" decoding="async">'
+      : '<div class="item-card__ph">' + icon(type === 'lost' ? 'tag-lost' : 'tag-found') + '<span>No photo</span></div>';
+    let action;
     if (item.status === 'Open') {
-      action = '<button type="button" class="btn btn-primary" data-action="claim" data-type="' + type +
-        '" data-id="' + Number(item.item_id) + '">Claim item</button>';
+      action = '<button class="btn btn--primary btn--block" type="button" data-action="claim" data-type="' +
+        type + '" data-id="' + itemId + '">Claim item</button>';
     } else if (item.status === 'Claimed' && isManagement()) {
-      action = '<button type="button" class="btn btn-success" data-action="resolve" data-type="' + type +
-        '" data-id="' + Number(item.item_id) + '">Mark resolved</button>';
+      action = '<button class="btn btn--success btn--block" type="button" data-action="resolve" data-type="' +
+        type + '" data-id="' + itemId + '">Mark resolved</button>';
     } else if (item.status === 'Claimed') {
-      action = '<p class="footer-note">Waiting for management to verify this claim.</p>';
+      action = '<p class="stub-note">' + icon('clock') + 'Waiting for management to verify this claim.</p>';
+    } else {
+      action = '<p class="stub-note stub-note--done">' + icon('check') + 'This item has been resolved.</p>';
     }
-
-    return '<article class="item-card" data-status="' + status + '">' +
-      '<div class="item-media">' + image +
-      '<span class="badge badge-' + status + '">' + escapeHtml(item.status) + '</span></div>' +
-      '<div class="item-card-body">' +
-      '<h2 class="item-card-name">' + escapeHtml(item.name) + '</h2>' +
-      '<p class="item-card-desc">' + escapeHtml(item.description) + '</p>' +
-      '<div class="item-card-meta"><span class="meta-chip">' + escapeHtml(item.location) +
-      '</span><span class="meta-chip">' + (type === 'lost' ? 'Lost ' : 'Found ') +
-      displayDate(item.item_date) + '</span></div>' +
-      (item.claimed_by_username ? '<p class="item-claimer">Claimed by ' +
-        escapeHtml(item.claimed_by_username) + '</p>' : '') +
-      '</div><div class="item-card-footer">' + action + '</div></article>';
-  }
-
-  function isManagement() {
-    return currentUser && (currentUser.role === 'Management' || currentUser.is_staff);
+    const claimedBy = item.claimed_by_username
+      ? '<li>' + icon('user') + '<span>Claimed by ' + escapeHtml(item.claimed_by_username) + '</span></li>'
+      : '';
+    return '<article class="item-card item-card--' + type + '" id="' + type + '-' + itemId +
+      '" data-status="' + status + '"><div class="item-card__in">' +
+      '<div class="item-card__media' + (isImageAvailable(item) ? '' : ' is-empty') + '">' + image +
+      '<span class="type-tab type-tab--' + type + '">' + icon(type === 'lost' ? 'tag-lost' : 'tag-found') +
+      (type === 'lost' ? 'Lost' : 'Found') + '</span>' +
+      '<span class="status status--' + status + ' item-card__status">' + escapeHtml(item.status) + '</span></div>' +
+      '<div class="item-card__body"><h2 class="item-card__name">' + escapeHtml(item.name) +
+      '</h2><p class="item-card__desc">' + escapeHtml(item.description) + '</p>' +
+      '<ul class="item-card__meta"><li>' + icon('pin') + '<span title="' + escapeHtml(item.location) +
+      '">' + escapeHtml(item.location) + '</span></li><li>' + icon('calendar') + '<span>' +
+      (type === 'lost' ? 'Lost ' : 'Found ') + formatDate(item.item_date) + '</span></li>' + claimedBy +
+      '</ul></div><div class="item-card__stub">' + action + '</div></div></article>';
   }
 
   async function loadItems(type) {
@@ -241,194 +376,277 @@
     return data.items;
   }
 
-  function filterControls() {
-    return '<div class="filters" data-filter-bar role="toolbar" aria-label="Filter by status">' +
-      '<button type="button" class="chip is-active" data-filter="all">All</button>' +
-      '<button type="button" class="chip" data-filter="open">Open</button>' +
-      '<button type="button" class="chip" data-filter="claimed">Claimed</button>' +
-      '<button type="button" class="chip" data-filter="resolved">Resolved</button></div>' +
-      '<p class="filter-empty" data-filter-empty hidden>No items with this status.</p>';
+  function filterControls(items, type) {
+    function count(status) {
+      return items.filter(function (item) { return item.status === status; }).length;
+    }
+    return '<div class="toolbar"><div class="segmented" data-filter-bar role="group" aria-label="Filter by status">' +
+      '<button class="segmented__btn is-active" type="button" data-filter="all" aria-pressed="true">All<span class="count">' +
+      items.length + '</span></button><button class="segmented__btn" type="button" data-filter="open" aria-pressed="false">' +
+      '<i class="dot dot--open"></i>Open<span class="count">' + count('Open') + '</span></button>' +
+      '<button class="segmented__btn" type="button" data-filter="claimed" aria-pressed="false">' +
+      '<i class="dot dot--claimed"></i>Claimed<span class="count">' + count('Claimed') + '</span></button>' +
+      '<button class="segmented__btn" type="button" data-filter="resolved" aria-pressed="false">' +
+      '<i class="dot dot--resolved"></i>Resolved<span class="count">' + count('Resolved') + '</span></button>' +
+      '</div></div><p class="filter-empty" data-filter-empty>No ' + type + ' items with this status.</p>';
   }
 
   async function renderItemsPage(type) {
     const label = type === 'lost' ? 'Lost' : 'Found';
     const items = await loadItems(type);
-    currentFilter = 'all';
     document.getElementById('topbar-title').textContent = label + ' items';
-    document.getElementById('topbar-actions').innerHTML = '';
-    pageContent.innerHTML = pageIntro(
-      'Discovery',
-      label + ' items',
-      type === 'lost'
-        ? 'Belongings students have reported missing. If one is yours, submit a claim.'
-        : 'Things turned in around campus. Recognize yours? Claim it and wait for verification.',
-      type
-    ) + (items.length
-      ? filterControls() + '<div class="items-grid" data-filter-group>' +
-        items.map(function (item) { return itemCard(type, item); }).join('') + '</div>'
-      : emptyState(
+    const header = '<header class="page-head"><div class="page-head__copy">' +
+      '<h1 class="page-head__title">' + (type === 'lost' ? 'Missing on campus' : 'Waiting to be claimed') + '</h1>' +
+      '<p class="page-head__lede">' + (type === 'lost'
+        ? 'Belongings students have reported lost. If one is yours, submit a claim.'
+        : 'Things turned in around campus. Recognize yours? Claim it and wait for verification.') + '</p></div>' +
+      '<form class="search" id="board-search-form" role="search">' + icon('search', 'search__icon') +
+      '<label class="sr-only" for="board-search">Search the board</label>' +
+      '<input id="board-search" name="q" type="search" placeholder="Search items" autocomplete="off" data-search-hotkey>' +
+      '<button class="btn btn--primary btn--sm" type="submit">Search</button></form></header>';
+    if (!items.length) {
+      pageContent.innerHTML = header + emptyState(
         'No ' + type + ' items yet',
-        type === 'lost'
-          ? 'Be the first to report something missing on campus.'
-          : 'Found something on campus? Turn it in so the owner can claim it.',
-        '<button type="button" class="btn btn-primary" data-action="report" data-type="' + type + '">Report ' + type + ' item</button>'
-      ));
+        type === 'lost' ? 'Be the first to report something missing on campus.' :
+          'Found something on campus? Turn it in so its owner can claim it.',
+        '<button class="btn btn--primary" type="button" data-action="report" data-type="' + type + '">' +
+        (type === 'lost' ? 'Report lost item' : 'Turn in found item') + '</button>',
+        'board'
+      );
+      return;
+    }
+    pageContent.innerHTML = header + filterControls(items, type) +
+      '<div class="items-grid" data-filter-group>' +
+      items.map(function (item) { return itemCard(type, item); }).join('') + '</div>';
   }
 
-  function recordRow(type, item) {
-    const dateLabel = type === 'lost' ? 'Lost' : 'Found';
-    return '<article class="record"><div><h3 class="record-title">' + escapeHtml(item.name) +
-      '</h3><p class="record-meta"><span>' + escapeHtml(item.location) + '</span><span>' +
-      dateLabel + ' ' + displayDate(item.item_date) + '</span></p></div><div class="record-tags">' +
-      '<span class="badge badge-' + type + '">' + type + '</span><span class="badge badge-' +
-      String(item.status).toLowerCase() + '">' + escapeHtml(item.status) +
-      '</span></div></article>';
+  function recordRow(type, item, clickable) {
+    const target = clickable
+      ? ' href="#" data-page="' + type + '" data-scroll-item="' + type + '-' + Number(item.item_id) + '"'
+      : '';
+    const image = isImageAvailable(item)
+      ? '<img src="' + API + '/items/' + type + '/' + Number(item.item_id) + '/image" alt="" loading="lazy">'
+      : icon(type === 'lost' ? 'tag-lost' : 'tag-found');
+    return '<a class="record"' + target + '><span class="record__thumb record__thumb--' + type + '">' +
+      image + '</span><span class="record__main"><span class="record__title">' + escapeHtml(item.name) +
+      '</span><span class="record__meta"><span class="type-label type-label--' + type + '">' +
+      (type === 'lost' ? 'Lost' : 'Found') + '</span><span class="record__loc">' +
+      escapeHtml(item.location) + '</span><span>' + formatDate(item.item_date) + '</span></span></span>' +
+      '<span class="status status--' + statusClass(item.status) + '">' + escapeHtml(item.status) + '</span>' +
+      icon('chevron', 'record__go') + '</a>';
+  }
+
+  function claimRow(item) {
+    const isResolved = item.status === 'Resolved';
+    const image = isImageAvailable(item)
+      ? '<img src="' + API + '/items/' + item.type + '/' + Number(item.item_id) + '/image" alt="" loading="lazy">'
+      : icon('tag');
+    return '<div class="record record--static"><span class="record__thumb record__thumb--claim">' + image +
+      '</span><span class="record__main"><span class="record__title">' + escapeHtml(item.name) +
+      '</span><span class="record__meta"><span class="record__state' + (isResolved ? ' record__state--done' : '') +
+      '">' + icon(isResolved ? 'check' : 'clock') + (isResolved ? 'Marked returned' : 'Waiting for verification') +
+      '</span></span></span><span class="status status--' + statusClass(item.status) + '">' +
+      escapeHtml(item.status) + '</span></div>';
+  }
+
+  function reportAction(type, title, hint, iconName) {
+    return '<button class="ticket ticket--' + type + '" type="button" data-action="report" data-type="' + type + '">' +
+      '<span class="ticket__stub">' + icon(iconName) + '</span><span class="ticket__body">' +
+      '<span class="ticket__title">' + title + '</span><span class="ticket__hint">' + hint +
+      '</span></span>' + icon('chevron', 'ticket__go') + '</button>';
   }
 
   async function renderUserHome() {
     const [lost, found] = await Promise.all([loadItems('lost'), loadItems('found')]);
     const ownLost = lost.filter(function (item) { return Number(item.reported_by) === Number(currentUser.id); });
     const ownFound = found.filter(function (item) { return Number(item.reported_by) === Number(currentUser.id); });
-    const claims = lost.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); })
-      .concat(found.filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); }));
+    const claims = lost.map(function (item) { return { ...item, type: 'lost' }; })
+      .concat(found.map(function (item) { return { ...item, type: 'found' }; }))
+      .filter(function (item) { return Number(item.claimed_by) === Number(currentUser.id); });
+    const waiting = claims.filter(function (item) { return item.status === 'Claimed'; }).length;
     document.getElementById('topbar-title').textContent = 'My Desk';
-    document.getElementById('topbar-actions').innerHTML = '';
 
-    const reports = ownLost.map(function (item) { return recordRow('lost', item); })
-      .concat(ownFound.map(function (item) { return recordRow('found', item); })).join('');
-    const claimRows = claims.map(function (item) {
-      return '<article class="record"><div><h3 class="record-title">' + escapeHtml(item.name) +
-        '</h3><p class="record-meta">' +
-        (item.status === 'Resolved' ? 'Marked returned' : 'Waiting for management to verify') +
-        '</p></div><span class="badge badge-' + String(item.status).toLowerCase() + '">' +
-        escapeHtml(item.status) + '</span></article>';
-    }).join('');
-
+    const stat = function (title, items, note) {
+      return '<div class="stat"><dt>' + title + '</dt><dd><span class="stat__n">' + items.length +
+        '</span><span class="stat__note">' + (items.length
+          ? '<i class="dot dot--open"></i>' + note(items)
+          : 'None yet') + '</span></dd></div>';
+    };
+    const reports = ownLost.map(function (item) { return recordRow('lost', item, true); })
+      .concat(ownFound.map(function (item) { return recordRow('found', item, true); })).join('');
+    const claimItems = claims.map(claimRow).join('');
     pageContent.innerHTML =
-      '<section class="welcome"><div class="welcome-copy">' +
-      '<h1>Welcome back, <em>' + escapeHtml(currentUser.username) + '</em></h1>' +
-      '<p class="lede">Looking for something? Search the lost board, or start a report below.</p>' +
-      '<form class="search-bar search-bar-lg" id="home-search-form" role="search">' +
-      '<span class="search-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>' +
-      '<label class="visually-hidden" for="home-search">Search items</label>' +
-      '<input id="home-search" name="q" type="search" placeholder="Search lost items by name, description or place">' +
-      '<kbd class="search-shortcut" aria-hidden="true">/</kbd>' +
-      '<button type="submit" class="btn btn-primary">Search</button></form>' +
-      '<div class="welcome-counts" aria-label="Your activity">' +
-      '<div><span>Lost reports</span><strong>' + ownLost.length + '</strong><small>' +
-      (ownLost.length ? 'On the board' : 'None yet') + '</small></div>' +
-      '<div><span>Found reports</span><strong>' + ownFound.length + '</strong><small>' +
-      (ownFound.length ? 'On the board' : 'None yet') + '</small></div>' +
-      '<div><span>Claims</span><strong>' + claims.length + '</strong><small>' +
-      (claims.length ? 'In progress' : 'None yet') + '</small></div></div></div>' +
-      '<figure class="welcome-plate"><img src="/img/cspc_campus.jpg" alt="CSPC Multi-Purpose Building I">' +
-      '<figcaption><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>Multi-Purpose Building I</figcaption></figure></section>' +
-      '<section class="capsules" aria-label="Quick actions">' +
-      '<button type="button" class="capsule capsule-deep" data-action="report" data-type="lost">' +
-      '<span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m20.2 13.2-7.2 7.2a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><circle cx="16.5" cy="7.5" r="1.2"/></svg></span>' +
-      '<span class="capsule-copy"><span class="capsule-title">Report a lost item</span><span class="capsule-note">Tell us what went missing</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>' +
-      '<button type="button" class="capsule capsule-mid" data-action="report" data-type="found">' +
-      '<span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m20.2 13.2-7.2 7.2a2 2 0 0 1-2.8 0l-6.6-6.6a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 1.4-.6h6.6a2 2 0 0 1 2 2v6.6a2 2 0 0 1-.6 1.4Z"/><path d="M12 7.7c1.4 0 2.4 1 2.4 2.2 0 2-2.4 4.3-2.4 4.3s-2.4-2.3-2.4-4.3c0-1.2 1-2.2 2.4-2.2Z"/></svg></span>' +
-      '<span class="capsule-copy"><span class="capsule-title">Turn in a found item</span><span class="capsule-note">Help it reach its owner</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>' +
-      '<a class="capsule capsule-ice" href="#" data-page="lost"><span class="capsule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>' +
-      '<span class="capsule-copy"><span class="capsule-title">Browse the board</span><span class="capsule-note">See everything reported</span></span><svg class="capsule-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></section>' +
-      '<div class="split"><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Items you reported</h2>' +
-      '<p class="panel-note">Lost and found reports attached to your account.</p></div><div class="panel-actions">' +
-      '<a class="btn btn-secondary btn-sm" href="#" data-page="lost">Lost board</a>' +
-      '<a class="btn btn-secondary btn-sm" href="#" data-page="found">Found board</a></div></div>' +
-      (reports || '<div class="empty-state"><svg class="empty-art" viewBox="0 0 100 72" fill="none" aria-hidden="true"><path d="M22 11h42l20 20-20 20H22a7 7 0 0 1-7-7V18a7 7 0 0 1 7-7Z" stroke="currentColor" stroke-width="1.7" stroke-dasharray="4 4"/><circle cx="27" cy="25" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M39 25h23M39 33h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="78" cy="54" r="12" fill="var(--panel)" stroke="currentColor" stroke-width="1.7"/></svg>' +
-        '<h3 class="empty-state-title">Nothing reported yet</h3>' +
-        '<p class="empty-state-text">When you report a lost or found item, it will show up here.</p></div>') +
-      '</section><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Your claims</h2>' +
-      '<p class="panel-note">Management verifies each claim before an item is returned.</p></div></div>' +
-      (claimRows || '<div class="empty-state"><svg class="empty-art empty-art-claim" viewBox="0 0 100 72" fill="none" aria-hidden="true"><path d="M17 16h66v40H17z" stroke="currentColor" stroke-width="1.7" stroke-dasharray="4 4"/><path d="M30 16v40m40-40v40" stroke="currentColor" stroke-width="1.7" stroke-dasharray="3 4"/><circle cx="50" cy="36" r="12" fill="var(--panel)" stroke="currentColor" stroke-width="1.7"/><path d="m45 36 3.5 3.5L55 33" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-        '<h3 class="empty-state-title">No claims yet</h3>' +
-        '<p class="empty-state-text">If you recognize a belonging, claim it and track it here.</p></div>') +
+      '<section class="hero" aria-labelledby="hero-title"><figure class="hero__photo">' +
+      '<img src="/img/cspc_campus.jpg" alt="CSPC Multi-Purpose Building I" fetchpriority="high">' +
+      '<figcaption>' + icon('pin') + 'Multi-Purpose Building I</figcaption></figure><div class="hero__copy">' +
+      '<h1 class="hero__title" id="hero-title">Welcome back, <span class="hero__name">' +
+      escapeHtml(currentUser.username) + '</span></h1><p class="hero__lede">Looking for something? Search the lost board, or start a report below.</p>' +
+      '<form class="search" id="home-search-form" role="search">' + icon('search', 'search__icon') +
+      '<label class="sr-only" for="home-search">Search lost items</label>' +
+      '<input id="home-search" type="search" name="q" placeholder="Search lost items by name, description or place" autocomplete="off" data-search-hotkey>' +
+      '<kbd class="search__kbd" aria-hidden="true">/</kbd><button class="btn btn--primary" type="submit">Search</button></form>' +
+      '<dl class="hero__stats" aria-label="Your activity">' +
+      stat('Lost reports', ownLost, function (items) { return items.filter(function (i) { return i.status === 'Open'; }).length + ' open'; }) +
+      stat('Found reports', ownFound, function (items) { return items.filter(function (i) { return i.status === 'Open'; }).length + ' open'; }) +
+      stat('Claims', claims, function () { return waiting ? waiting + ' awaiting verification' : 'None waiting'; }) +
+      '</dl></div></section>' +
+      '<section class="tickets" aria-label="Quick actions">' +
+      reportAction('lost', 'Report a lost item', 'Tell us what went missing', 'tag-lost') +
+      reportAction('found', 'Turn in a found item', 'Help it reach its owner', 'tag-found') +
+      '<a class="ticket ticket--board" href="#" data-page="lost"><span class="ticket__stub">' + icon('board') +
+      '</span><span class="ticket__body"><span class="ticket__title">Browse the board</span>' +
+      '<span class="ticket__hint">See everything reported</span></span>' + icon('chevron', 'ticket__go') + '</a>' +
+      '</section><div class="split"><section class="panel" aria-labelledby="reports-heading">' +
+      '<header class="panel__head"><div><h2 class="panel__title" id="reports-heading">Items you reported</h2>' +
+      '<p class="panel__note">Lost and found reports attached to your account.</p></div><div class="panel__actions">' +
+      '<a class="btn btn--ghost btn--sm" href="#" data-page="lost">Lost board</a>' +
+      '<a class="btn btn--ghost btn--sm" href="#" data-page="found">Found board</a></div></header>' +
+      (reports ? '<div class="records">' + reports + '</div>' :
+        '<div class="empty">' + emptyArt('tag') + '<h3 class="empty__title">Nothing reported yet</h3>' +
+        '<p class="empty__text">When you report a lost or found item, it shows up here so you can follow it.</p>' +
+        '<div class="empty__actions"><button class="btn btn--primary btn--sm" type="button" data-action="report" data-type="lost">Report lost item</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-action="report" data-type="found">Turn in found item</button></div></div>') +
+      '</section><section class="panel" aria-labelledby="claims-heading"><header class="panel__head"><div>' +
+      '<h2 class="panel__title" id="claims-heading">Your claims</h2><p class="panel__note">Management verifies each claim before an item is returned.</p>' +
+      '</div></header>' + (claimItems ? '<div class="records">' + claimItems + '</div>' :
+        '<div class="empty">' + emptyArt('ticket') + '<h3 class="empty__title">No claims yet</h3>' +
+        '<p class="empty__text">If you recognize a belonging on the board, claim it and track it here.</p>' +
+        '<div class="empty__actions"><a class="btn btn--primary btn--sm" href="#" data-page="found">Browse found items</a></div></div>') +
       '</section></div>';
+  }
+
+  function managerRecord(entry) {
+    const type = entry.type;
+    const item = entry.item;
+    const target = type + '-' + Number(item.item_id);
+    const image = isImageAvailable(item)
+      ? '<img src="' + API + '/items/' + type + '/' + Number(item.item_id) + '/image" alt="" loading="lazy">'
+      : icon(type === 'lost' ? 'tag-lost' : 'tag-found');
+    return '<a class="record" href="#" data-page="' + type + '" data-scroll-item="' + target +
+      '"><span class="record__thumb record__thumb--' + type + '">' + image +
+      '</span><span class="record__main"><span class="record__title">' + escapeHtml(item.name) +
+      '</span><span class="record__meta"><span class="type-label type-label--' + type + '">' +
+      (type === 'lost' ? 'Lost' : 'Found') + '</span><span class="record__loc">' +
+      escapeHtml(item.location) + '</span><span>' + formatSince(item.created_at) + '</span></span></span>' +
+      '<span class="status status--' + statusClass(item.status) + '">' + escapeHtml(item.status) + '</span>' +
+      icon('chevron', 'record__go') + '</a>';
   }
 
   async function renderManagement() {
     const [lost, found] = await Promise.all([loadItems('lost'), loadItems('found')]);
-    const items = lost.map(function (item) { return { type: 'lost', item }; })
-      .concat(found.map(function (item) { return { type: 'found', item }; }));
-    const claimed = items.filter(function (entry) { return entry.item.status === 'Claimed'; });
-    const open = items.filter(function (entry) { return entry.item.status === 'Open'; });
-    const resolved = items.filter(function (entry) { return entry.item.status === 'Resolved'; });
-    document.getElementById('topbar-title').textContent = 'Management';
-    document.getElementById('topbar-actions').innerHTML = '';
+    const entries = lost.map(function (item) { return { type: 'lost', item: item }; })
+      .concat(found.map(function (item) { return { type: 'found', item: item }; }))
+      .sort(function (a, b) { return new Date(b.item.created_at) - new Date(a.item.created_at); });
+    const pending = entries.filter(function (entry) { return entry.item.status === 'Claimed'; });
+    const open = entries.filter(function (entry) { return entry.item.status === 'Open'; });
+    const resolved = entries.filter(function (entry) { return entry.item.status === 'Resolved'; });
+    document.getElementById('topbar-title').textContent = 'Management Dashboard';
+    const pendingRows = pending.map(function (entry) {
+      const item = entry.item;
+      const itemUrl = entry.type + '-' + Number(item.item_id);
+      const image = isImageAvailable(item)
+        ? '<img src="' + API + '/items/' + entry.type + '/' + Number(item.item_id) + '/image" alt="" loading="lazy">'
+        : icon(entry.type === 'lost' ? 'tag-lost' : 'tag-found');
+      const requester = item.claimed_by_username || 'Unknown user';
+      return '<tr><td data-label="Item"><a class="cell-item" href="#" data-page="' + entry.type +
+        '" data-scroll-item="' + itemUrl + '"><span class="record__thumb record__thumb--' + entry.type +
+        '">' + image + '</span><span class="cell-item__text"><span class="record__title">' +
+        escapeHtml(item.name) + '</span><span class="cell-item__meta"><span class="type-label type-label--' +
+        entry.type + '">' + (entry.type === 'lost' ? 'Lost' : 'Found') + '</span><span class="record__loc">' +
+        escapeHtml(item.location) + '</span></span></span></a></td><td data-label="Claimed by"><span class="cell-user">' +
+        '<span class="mini-avatar" aria-hidden="true">' + escapeHtml(requester.slice(0, 1).toUpperCase()) +
+        '</span>' + escapeHtml(requester) + '</span></td><td class="table__action">' +
+        '<button class="btn btn--success btn--sm" type="button" data-action="resolve" data-type="' +
+        entry.type + '" data-id="' + Number(item.item_id) + '">' + icon('check') + 'Mark resolved</button></td></tr>';
+    }).join('');
+    const recent = entries.slice(0, 10).map(managerRecord).join('');
     pageContent.innerHTML =
-      '<section class="ops"><div class="ops-copy"><p class="eyebrow">Management desk</p>' +
-      (claimed.length
-        ? '<h1>' + claimed.length + ' claim' + (claimed.length === 1 ? '' : 's') + ' waiting.</h1>' +
-          '<p class="lede">Verify the claimant, hand the item over, then mark the record resolved.</p>'
-        : '<h1>The desk is clear.</h1><p class="lede">No claims are waiting. Counts below reflect live records.</p>') +
-      '<div class="ops-links"><a class="btn btn-primary" href="#" data-page="lost">Lost items</a>' +
-      '<a class="btn btn-secondary" href="#" data-page="found">Found items</a></div></div>' +
-      '<div class="meter" aria-label="System summary">' +
-      '<div class="meter-cell"><span class="meter-value">' + lost.length + '</span><span class="meter-label">Lost</span></div>' +
-      '<div class="meter-cell"><span class="meter-value">' + found.length + '</span><span class="meter-label">Found</span></div>' +
-      '<div class="meter-cell"><span class="meter-value">' + open.length + '</span><span class="meter-label">Open</span></div>' +
-      '<div class="meter-cell meter-cell-focus"><span class="meter-value">' + claimed.length + '</span><span class="meter-label">Pending</span></div>' +
-      '<div class="meter-cell"><span class="meter-value">' + resolved.length + '</span><span class="meter-label">Resolved</span></div>' +
-      '</div></section><section class="panel"><div class="panel-head"><div>' +
-      '<h2 class="panel-title">Claims awaiting verification</h2>' +
-      '<p class="panel-note">Resolve a claim only after the item has been returned.</p></div></div>' +
-      (claimed.length ? '<div class="record-scroll">' + claimed.map(function (entry) {
-        return '<article class="claim-row"><div><h3 class="record-title">' + escapeHtml(entry.item.name) +
-          ' <span class="badge badge-' + entry.type + '">' + entry.type + '</span></h3>' +
-          '<p class="record-meta"><span>Claimed by ' +
-          escapeHtml(entry.item.claimed_by_username || 'Unknown user') + '</span><span>' +
-          escapeHtml(entry.item.location) + '</span></p></div>' +
-          '<button type="button" class="btn btn-success" data-action="resolve" data-type="' +
-          entry.type + '" data-id="' + Number(entry.item.item_id) + '">Mark resolved</button></article>';
-      }).join('') + '</div>' :
-        '<div class="empty-state"><div class="empty-orb" aria-hidden="true"></div>' +
-        '<h3 class="empty-state-title">Nothing waiting</h3>' +
-        '<p class="empty-state-text">New claims will appear here as soon as a student claims an item.</p></div>') +
-      '</section>';
+      '<header class="page-head page-head--ops"><div class="page-head__copy">' +
+      (pending.length
+        ? '<h1 class="page-head__title">' + pending.length + ' claim' + (pending.length === 1 ? '' : 's') + ' waiting for verification</h1>' +
+          '<p class="page-head__lede">Verify the claimant, hand the item over, then mark the record resolved.</p>'
+        : '<h1 class="page-head__title">The desk is clear</h1><p class="page-head__lede">No claims are waiting. The counts below are live records in the system.</p>') +
+      '</div><div class="page-head__actions"><a class="btn btn--primary" href="#" data-page="lost">' +
+      icon('tag-lost') + 'Lost items</a><a class="btn btn--ghost" href="#" data-page="found">' +
+      icon('tag-found') + 'Found items</a></div></header>' +
+      '<dl class="kpis" aria-label="System summary"><div class="kpi kpi--lost"><dt>Lost reports</dt><dd>' +
+      lost.length + '</dd></div><div class="kpi kpi--found"><dt>Found reports</dt><dd>' + found.length +
+      '</dd></div><div class="kpi kpi--open"><dt>Open items</dt><dd>' + open.length +
+      '</dd></div><div class="kpi kpi--claimed' + (pending.length ? ' is-alert' : '') +
+      '"><dt>Pending claims</dt><dd>' + pending.length + '</dd></div><div class="kpi kpi--resolved"><dt>Resolved</dt><dd>' +
+      resolved.length + '</dd></div></dl><div class="split split--ops">' +
+      '<section class="panel" aria-labelledby="pending-heading"><header class="panel__head"><div>' +
+      '<h2 class="panel__title" id="pending-heading">Claims awaiting verification</h2>' +
+      '<p class="panel__note">Resolve a claim only after the item has been returned.</p></div>' +
+      (pending.length ? '<span class="status status--claimed">' + pending.length + ' pending</span>' : '') +
+      '</header>' + (pending.length
+        ? '<div class="table-wrap"><table class="table"><thead><tr><th scope="col">Item</th><th scope="col">Claimed by</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>' +
+          pendingRows + '</tbody></table></div>'
+        : '<div class="empty">' + emptyArt('clear') + '<h3 class="empty__title">Nothing waiting</h3>' +
+          '<p class="empty__text">New claims appear here as soon as a student submits one.</p></div>') +
+      '</section><section class="panel" aria-labelledby="recent-heading"><header class="panel__head"><div>' +
+      '<h2 class="panel__title" id="recent-heading">Latest reports</h2><p class="panel__note">The most recent lost and found records.</p>' +
+      '</div></header>' + (recent ? '<div class="records">' + recent + '</div>' :
+        '<div class="empty">' + emptyArt('board') + '<h3 class="empty__title">No reports yet</h3>' +
+        '<p class="empty__text">Lost and found reports will be listed here as they come in.</p></div>') +
+      '</section></div>';
   }
 
   async function renderSearch(query) {
     document.getElementById('topbar-title').textContent = 'Search';
-    document.getElementById('topbar-actions').innerHTML = '';
     const safeQuery = escapeHtml(query || '');
-    let resultsMarkup = '<section class="panel search-idle"><div class="empty-state">' +
-      '<div class="empty-orb" aria-hidden="true"></div><h2 class="empty-state-title">Start with a word</h2>' +
-      '<p class="empty-state-text">Search looks through item names, descriptions and locations.</p></div></section>';
+    let resultMarkup = '<div class="empty">' + emptyArt('search') + '<h2 class="empty__title">Start with a word</h2>' +
+      '<p class="empty__text">Search looks through item names, descriptions and locations.</p></div>';
     if (query) {
       const data = await api('/search?q=' + encodeURIComponent(query));
       const lost = data.results.lost || [];
       const found = data.results.found || [];
       const matches = lost.map(function (item) { return itemCard('lost', item); })
         .concat(found.map(function (item) { return itemCard('found', item); })).join('');
-      resultsMarkup = matches
-        ? '<p class="lede">' + (lost.length + found.length) + ' matching item(s).</p><div class="items-grid">' + matches + '</div>'
-        : emptyState('No match for “' + safeQuery + '”', 'Try a shorter name, a detail, or a campus location.');
+      resultMarkup = matches
+        ? '<p class="page-head__lede">' + (lost.length + found.length) + ' matching item(s).</p>' +
+          '<div class="items-grid">' + matches + '</div>'
+        : '<section class="panel"><div class="empty empty--page">' + emptyArt('search') +
+          '<h2 class="empty__title">No match for &ldquo;' + safeQuery + '&rdquo;</h2>' +
+          '<p class="empty__text">Try a shorter name, a detail, or a campus location.</p></div></section>';
     }
-    pageContent.innerHTML =
-      '<header class="page-intro page-intro-solo"><div><p class="eyebrow">Campus search</p>' +
-      '<h1>Search lost and found items.</h1><p class="lede">Look up a name, a detail from the description, or a location.</p></div></header>' +
-      '<form class="search-bar search-bar-lg" id="search-form" role="search">' +
-      '<span class="search-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>' +
-      '<label class="visually-hidden" for="search-query">Search items</label>' +
-      '<input id="search-query" name="q" type="search" value="' + safeQuery + '" placeholder="Search items…">' +
-      '<button type="submit" class="btn btn-primary">Search</button></form>' + resultsMarkup;
+    pageContent.innerHTML = '<header class="page-head"><div class="page-head__copy">' +
+      '<h1 class="page-head__title">Search lost and found items</h1>' +
+      '<p class="page-head__lede">Look up a name, a detail from the description, or a location.</p></div></header>' +
+      '<form class="search search--lg" id="search-form" role="search">' + icon('search', 'search__icon') +
+      '<label class="sr-only" for="search-query">Search items</label><input id="search-query" name="q" type="search" value="' +
+      safeQuery + '" placeholder="Search items" autocomplete="off" data-search-hotkey><button class="btn btn--primary" type="submit">Search</button></form>' +
+      '<div class="search-results">' + resultMarkup + '</div>';
+  }
+
+  function pageError(error) {
+    pageContent.innerHTML = '<section class="panel"><div class="empty empty--page">' + emptyArt('board') +
+      '<h2 class="empty__title">Could not load this page</h2><p class="empty__text">' +
+      escapeHtml(error.message) + '</p><button class="btn btn--primary" type="button" data-action="retry">Try again</button></div></section>';
   }
 
   async function renderPage(page, query) {
     if (!currentUser) return;
-    if (page === 'management' && !isManagement()) page = 'home';
+    if (page === 'management' && !isManagement()) {
+      page = 'home';
+      showToast('Management access is required for that page.', 'error');
+    }
     currentPage = page;
-    document.querySelectorAll('[data-page]').forEach(function (link) {
+    document.querySelectorAll('.nav__link[data-page]').forEach(function (link) {
       link.classList.toggle('is-active', link.dataset.page === page);
     });
     closeSidebar();
-
+    document.getElementById('scroll-area').scrollTop = 0;
     try {
       if (page === 'lost' || page === 'found') await renderItemsPage(page);
       else if (page === 'management') await renderManagement();
       else if (page === 'search') await renderSearch(query || '');
       else await renderUserHome();
+      if (window.pendingScrollItem) {
+        const target = document.getElementById(window.pendingScrollItem);
+        window.pendingScrollItem = null;
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     } catch (error) {
       pageError(error);
     }
@@ -436,54 +654,53 @@
 
   document.getElementById('login-form').addEventListener('submit', async function (event) {
     event.preventDefault();
-    const button = event.currentTarget.querySelector('[type="submit"]');
-    const errorBox = document.getElementById('login-error');
-    errorBox.hidden = true;
-    button.disabled = true;
+    const form = event.currentTarget;
+    const button = form.querySelector('[type="submit"]');
+    setBanner('auth-error', '');
+    setBusy(button, true);
     try {
-      const form = new FormData(event.currentTarget);
+      const fields = new FormData(form);
       const data = await api('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
-          identifier: form.get('identifier'),
-          password: form.get('password'),
+          identifier: fields.get('identifier'),
+          password: fields.get('password'),
         }),
       });
+      form.reset();
       showApp(data.user);
-      event.currentTarget.reset();
     } catch (error) {
-      errorBox.textContent = error.message;
-      errorBox.hidden = false;
+      setBanner('auth-error', error.message);
     } finally {
-      button.disabled = false;
+      setBusy(button, false);
     }
   });
 
   document.getElementById('signup-form').addEventListener('submit', async function (event) {
     event.preventDefault();
-    const button = event.currentTarget.querySelector('[type="submit"]');
-    const errorBox = document.getElementById('signup-error');
-    errorBox.hidden = true;
-    button.disabled = true;
+    const form = event.currentTarget;
+    const button = form.querySelector('[type="submit"]');
+    setBanner('auth-error', '');
+    setBusy(button, true);
     try {
-      const form = new FormData(event.currentTarget);
+      const fields = new FormData(form);
       await api('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
-          username: form.get('username'),
-          id_number: form.get('id_number'),
-          password: form.get('password'),
+          username: fields.get('username'),
+          id_number: fields.get('id_number'),
+          password: fields.get('password'),
         }),
       });
+      const idNumber = fields.get('id_number');
+      form.reset();
       showAuth('login');
-      showAlert('Account created. You can now sign in with your ID number.', 'success');
-      document.getElementById('login-identifier').value = form.get('id_number');
-      event.currentTarget.reset();
+      document.getElementById('login-identifier').value = idNumber;
+      showToast('Account created. You can now sign in with your ID number.');
     } catch (error) {
-      errorBox.textContent = error.message;
-      errorBox.hidden = false;
+      setBanner('auth-error', error.message);
     } finally {
-      button.disabled = false;
+      setBusy(button, false);
     }
   });
 
@@ -491,207 +708,285 @@
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector('[type="submit"]');
-    const errorBox = document.getElementById('report-error');
-    errorBox.hidden = true;
-    button.disabled = true;
+    const type = document.getElementById('report-type').value;
+    setBanner('report-error', '');
+    setBusy(button, true);
     try {
-      const type = document.getElementById('report-type').value;
       await api('/items/' + type, { method: 'POST', body: new FormData(form) });
       closeReport();
-      showAlert('Your item was reported.', 'success');
+      showToast(type === 'lost' ? 'Your lost item was reported.' : 'Your found item was reported.');
       await renderPage(currentPage);
     } catch (error) {
-      errorBox.textContent = error.message;
-      errorBox.hidden = false;
+      setBanner('report-error', error.message);
     } finally {
-      button.disabled = false;
+      setBusy(button, false);
     }
   });
 
   document.addEventListener('submit', function (event) {
     const form = event.target;
-    if (form.id !== 'search-form' && form.id !== 'home-search-form') return;
+    if (!['search-form', 'home-search-form', 'board-search-form'].includes(form.id)) return;
     event.preventDefault();
-    const query = new FormData(form).get('q').trim();
+    const query = String(new FormData(form).get('q') || '').trim();
     renderPage('search', query);
   });
 
-  document.addEventListener('click', async function (event) {
-    const themeChoice = event.target.closest('[data-theme-choice]');
-    if (themeChoice) {
-      setTheme(themeChoice.dataset.themeChoice);
+  async function handleAction(action) {
+    if (action.dataset.action === 'report') {
+      openReport(action.dataset.type);
       return;
     }
-
-    const pageLink = event.target.closest('[data-page]');
-    if (pageLink) {
-      event.preventDefault();
-      renderPage(pageLink.dataset.page);
-      return;
-    }
-
-    const filterButton = event.target.closest('[data-filter]');
-    if (filterButton) {
-      currentFilter = filterButton.dataset.filter;
-      const bar = filterButton.closest('[data-filter-bar]');
-      bar.querySelectorAll('[data-filter]').forEach(function (button) {
-        button.classList.toggle('is-active', button === filterButton);
-      });
-      const group = document.querySelector('[data-filter-group]');
-      let shown = 0;
-      group.querySelectorAll('[data-status]').forEach(function (card) {
-        const match = currentFilter === 'all' || card.dataset.status === currentFilter;
-        card.classList.toggle('is-filtered-out', !match);
-        if (match) shown += 1;
-      });
-      const empty = document.querySelector('[data-filter-empty]');
-      if (empty) empty.hidden = shown !== 0;
-      return;
-    }
-
-    const action = event.target.closest('[data-action]');
-    if (!action) return;
-    if (action.dataset.action === 'show-signup') return showAuth('signup');
-    if (action.dataset.action === 'show-login') return showAuth('login');
-    if (action.dataset.action === 'report') return openReport(action.dataset.type);
-    if (action.dataset.action === 'close-report') return closeReport();
     if (action.dataset.action === 'logout') {
       try {
         await api('/auth/logout', { method: 'POST' });
       } catch (error) {
-        showAlert(error.message, 'error');
+        showToast(error.message, 'error');
       } finally {
         showAuth('login');
       }
       return;
     }
-    if (action.dataset.action === 'claim') {
+    if (action.dataset.action === 'claim' || action.dataset.action === 'resolve') {
+      const resolving = action.dataset.action === 'resolve';
       const confirmed = await requestConfirmation(
-        'Claim this item?',
-        'Management will verify your claim before the item is returned.'
+        resolving ? 'Resolve this item?' : 'Claim this item?',
+        resolving
+          ? 'Mark this item as resolved after it has been returned to the claimant.'
+          : 'Management will verify your claim before the item is returned.',
+        resolving ? 'Mark resolved' : 'Submit claim'
       );
       if (!confirmed) return;
       try {
-        await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/claim', { method: 'POST' });
-        showAlert('Claim submitted. Management will verify the item.', 'success');
+        await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/' +
+          (resolving ? 'resolve' : 'claim'), { method: 'POST' });
+        showToast(resolving ? 'Item marked as resolved.' : 'Claim submitted. Management will verify the item.');
         await renderPage(currentPage);
       } catch (error) {
-        showAlert(error.message, 'error');
+        showToast(error.message, 'error');
       }
       return;
     }
-    if (action.dataset.action === 'resolve') {
-      const confirmed = await requestConfirmation(
-        'Resolve this item?',
-        'Mark this item as resolved after it has been returned to the claimant.'
-      );
-      if (!confirmed) return;
-      try {
-        await api('/items/' + action.dataset.type + '/' + action.dataset.id + '/resolve', { method: 'POST' });
-        showAlert('Item marked as resolved.', 'success');
-        await renderPage(currentPage);
-      } catch (error) {
-        showAlert(error.message, 'error');
-      }
+    if (action.dataset.action === 'retry') renderPage(currentPage);
+  }
+
+  document.addEventListener('click', function (event) {
+    const target = event.target instanceof Element ? event.target : event.target.parentElement;
+    if (!target) return;
+    const themeButton = target.closest('[data-theme-toggle]');
+    if (themeButton) {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      setTheme(next, true);
+      return;
     }
+    const authSwitch = target.closest('[data-auth-switch]');
+    if (authSwitch) {
+      event.preventDefault();
+      showAuth(authSwitch.dataset.authSwitch);
+      return;
+    }
+    const reportTrigger = target.closest('[data-open-report]');
+    if (reportTrigger) {
+      openReport(reportTrigger.dataset.openReport);
+      return;
+    }
+    const closeButton = target.closest('[data-close-dialog]');
+    if (closeButton) {
+      if (closeButton.dataset.closeDialog === 'report-dialog') closeReport();
+      return;
+    }
+    if (target.closest('[data-confirm-cancel]')) {
+      finishConfirmation(false);
+      return;
+    }
+    if (target.closest('[data-confirm-accept]')) {
+      finishConfirmation(true);
+      return;
+    }
+    if (target === confirmDialog || target === reportDialog) {
+      if (target === confirmDialog) finishConfirmation(false);
+      else closeReport();
+      return;
+    }
+    const pageLink = target.closest('[data-page]');
+    if (pageLink) {
+      event.preventDefault();
+      const scrollItem = pageLink.dataset.scrollItem;
+      window.pendingScrollItem = scrollItem || null;
+      renderPage(pageLink.dataset.page);
+      return;
+    }
+    const filterButton = target.closest('[data-filter]');
+    if (filterButton) {
+      const bar = filterButton.closest('[data-filter-bar]');
+      bar.querySelectorAll('[data-filter]').forEach(function (button) {
+        const active = button === filterButton;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      let shown = 0;
+      document.querySelectorAll('[data-filter-group] [data-status]').forEach(function (card) {
+        const match = filterButton.dataset.filter === 'all' ||
+          card.dataset.status === filterButton.dataset.filter;
+        card.classList.toggle('is-filtered-out', !match);
+        if (match) shown += 1;
+      });
+      const empty = document.querySelector('[data-filter-empty]');
+      if (empty) empty.classList.toggle('is-visible', shown === 0);
+      return;
+    }
+    const action = target.closest('[data-action]');
+    if (action) handleAction(action);
   });
 
-  document.getElementById('report-image').addEventListener('change', function (event) {
-    const file = event.target.files && event.target.files[0];
-    const preview = document.getElementById('report-preview');
-    const errorBox = document.getElementById('report-error');
-    const uploadText = document.getElementById('upload-area-text');
+  const imageInput = document.getElementById('report-image');
+  const uploadArea = document.getElementById('upload-area');
+  imageInput.addEventListener('change', function () {
+    const file = imageInput.files && imageInput.files[0];
+    const preview = document.getElementById('upload-preview');
     if (!file) {
-      preview.hidden = true;
-      preview.classList.remove('is-visible');
-      uploadText.textContent = 'Drop a photo or click to browse';
+      resetPreview();
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      event.target.value = '';
-      errorBox.textContent = 'Image must be 5 MB or smaller.';
-      errorBox.hidden = false;
-      preview.hidden = true;
-      preview.classList.remove('is-visible');
-      uploadText.textContent = 'Drop a photo or click to browse';
+      imageInput.value = '';
+      setBanner('report-error', 'Image must be 5 MB or smaller.');
+      resetPreview();
       return;
     }
     if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
-      event.target.value = '';
-      errorBox.textContent = 'Only JPEG, PNG, GIF or WebP images are allowed.';
-      errorBox.hidden = false;
-      preview.hidden = true;
-      preview.classList.remove('is-visible');
-      uploadText.textContent = 'Drop a photo or click to browse';
+      imageInput.value = '';
+      setBanner('report-error', 'Only JPEG, PNG, GIF or WebP images are allowed.');
+      resetPreview();
       return;
     }
-    errorBox.hidden = true;
-    preview.src = URL.createObjectURL(file);
-    preview.hidden = false;
+    setBanner('report-error', '');
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(file);
+    preview.src = previewUrl;
     preview.classList.add('is-visible');
-    uploadText.textContent = file.name;
+    document.getElementById('upload-area-text').textContent = file.name;
   });
 
-  const uploadArea = document.getElementById('upload-area');
   uploadArea.addEventListener('dragover', function (event) {
     event.preventDefault();
-    uploadArea.classList.add('is-dragging');
+    uploadArea.classList.add('is-drag');
   });
   uploadArea.addEventListener('dragleave', function (event) {
-    if (!uploadArea.contains(event.relatedTarget)) uploadArea.classList.remove('is-dragging');
+    if (!uploadArea.contains(event.relatedTarget)) uploadArea.classList.remove('is-drag');
   });
   uploadArea.addEventListener('drop', function (event) {
     event.preventDefault();
-    uploadArea.classList.remove('is-dragging');
-    if (!event.dataTransfer.files.length) return;
+    uploadArea.classList.remove('is-drag');
+    const file = event.dataTransfer && event.dataTransfer.files[0];
+    if (!file) return;
     const transfer = new DataTransfer();
-    Array.from(event.dataTransfer.files).forEach(function (file) { transfer.items.add(file); });
-    const imageInput = document.getElementById('report-image');
+    transfer.items.add(file);
     imageInput.files = transfer.files;
     imageInput.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-  document.getElementById('confirmCancel').addEventListener('click', function () {
-    finishConfirmation(false);
-  });
-  document.getElementById('confirmProceed').addEventListener('click', function () {
-    finishConfirmation(true);
-  });
-  confirmDialog.addEventListener('click', function (event) {
-    if (event.target === confirmDialog) finishConfirmation(false);
-  });
-
-  mobileToggle.addEventListener('click', function () {
-    sidebar.classList.add('is-open');
-    sidebarOverlay.hidden = false;
-    sidebarOverlay.classList.add('is-open');
-    document.body.classList.add('nav-lock');
-    mobileToggle.setAttribute('aria-expanded', 'true');
+  menuButton.addEventListener('click', function () {
+    if (sidebar.classList.contains('is-open')) closeSidebar(true);
+    else openSidebar();
   });
   sidebarOverlay.addEventListener('click', closeSidebar);
-  reportModal.addEventListener('click', function (event) {
-    if (event.target === reportModal) closeReport();
+  document.getElementById('logout-button').addEventListener('click', function () {
+    handleAction({ dataset: { action: 'logout' } });
   });
+
   document.addEventListener('keydown', function (event) {
     if (event.key === '/' && currentUser &&
-        !event.target.matches('input, textarea, select, [contenteditable="true"]')) {
-      event.preventDefault();
-      const searchInput = document.getElementById('home-search') ||
+        !event.metaKey && !event.ctrlKey && !event.altKey &&
+        !event.target.matches('input, textarea, select, [contenteditable="true"]') &&
+        !document.querySelector('.dialog.is-open')) {
+      const searchInput = document.querySelector('[data-search-hotkey]') ||
         document.getElementById('search-query');
-      if (searchInput) searchInput.focus();
+      if (searchInput) {
+        event.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
     }
     if (event.key === 'Escape') {
-      if (confirmDialog.classList.contains('is-open')) finishConfirmation(false);
-      closeReport();
-      closeSidebar();
+      if (confirmDialog.classList.contains('is-open')) {
+        finishConfirmation(false);
+        return;
+      }
+      if (reportDialog.classList.contains('is-open')) {
+        closeReport();
+        return;
+      }
+      closeSidebar(true);
+      return;
+    }
+    if (event.key === 'Tab') {
+      const dialog = document.querySelector('.dialog.is-open');
+      const scope = dialog || (sidebar.classList.contains('is-open') ? sidebar : null);
+      if (!scope) return;
+      const nodes = Array.from(scope.querySelectorAll(focusableSelector))
+        .filter(function (node) { return node.offsetParent !== null; });
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   });
 
+  const systemTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+  if (systemTheme && !getSavedTheme()) {
+    const onSystemThemeChange = function (event) {
+      if (!getSavedTheme()) setTheme(event.matches ? 'light' : 'dark', false);
+    };
+    if (systemTheme.addEventListener) systemTheme.addEventListener('change', onSystemThemeChange);
+    else if (systemTheme.addListener) systemTheme.addListener(onSystemThemeChange);
+  }
+  window.addEventListener('storage', function (event) {
+    if (event.key === THEME_KEY && (event.newValue === 'light' || event.newValue === 'dark')) {
+      setTheme(event.newValue, false);
+    }
+  });
+  if (window.matchMedia) {
+    const desktopLayout = window.matchMedia('(min-width: 1024px)');
+    const onLayoutChange = function (event) {
+      if (event.matches) closeSidebar(false);
+    };
+    if (desktopLayout.addEventListener) desktopLayout.addEventListener('change', onLayoutChange);
+    else if (desktopLayout.addListener) desktopLayout.addListener(onLayoutChange);
+  }
+
+  document.querySelectorAll('input[type="password"]').forEach(function (input) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pw';
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pw__btn';
+    button.setAttribute('aria-label', 'Show password');
+    button.setAttribute('aria-pressed', 'false');
+    button.innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-eye"></use></svg>';
+    wrapper.appendChild(button);
+    button.addEventListener('click', function () {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      button.setAttribute('aria-pressed', String(show));
+      button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      button.querySelector('use').setAttribute('href', show ? '#i-eye-off' : '#i-eye');
+      input.focus();
+    });
+  });
+  setTheme(document.documentElement.getAttribute('data-theme'), false);
+
   api('/auth/me')
-    .then(function (data) {
-      showApp(data.user);
-    })
-    .catch(function () {
+    .then(function (data) { showApp(data.user); })
+    .catch(function (error) {
       showAuth('login');
+      if (error.status && error.status !== 401) showToast(error.message, 'error');
     });
 })();
