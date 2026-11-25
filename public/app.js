@@ -7,16 +7,18 @@ function setAuthUI(authenticated, user) {
   var login = $('page-login'); var signup = $('page-signup'); var app = $('page-app');
   var headerUser = $('header-user'); var headerLogout = $('header-logout');
   if (authenticated) {
-    login.classList.add('hidden'); signup.classList.add('hidden'); app.classList.remove('hidden');
+    login.classList.remove('active'); signup.classList.remove('active');
+    login.classList.add('hidden'); signup.classList.add('hidden');
+    app.classList.remove('hidden'); app.classList.add('active');
     $('app-user').textContent = 'Logged in as ' + user.username + ' (' + user.role + ')';
     headerUser.textContent = user.username + ' (' + user.role + ')';
     headerUser.classList.remove('hidden'); headerLogout.classList.remove('hidden');
     if (user.role === 'Management') { $('mgmt-tab').classList.remove('hidden'); }
-    loadItems('lost'); loadItems('found'); loadClaims();
-    if (user.role === 'Management') loadManagement();
+    tab('lost');
   } else {
+    app.classList.remove('active');
     login.classList.remove('hidden'); login.classList.add('active');
-    signup.classList.add('hidden'); app.classList.add('hidden');
+    signup.classList.remove('active'); signup.classList.add('hidden'); app.classList.add('hidden');
     headerUser.classList.add('hidden'); headerLogout.classList.add('hidden');
   }
 }
